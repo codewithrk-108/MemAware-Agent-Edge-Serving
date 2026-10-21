@@ -8,7 +8,7 @@
     idle_syn       tool delays x0 / x4 at N = 8             -> cost of idle periods between agent steps
     retention_*    host prompt cache off, prefix reuse off  -> do retained contexts / reusable prefixes matter
 
-Runs already in results/phase1 are skipped, so an interrupted sweep resumes.
+Runs already in results/<platform>/phase1 are skipped, so an interrupted sweep resumes.
 """
 
 import argparse
@@ -17,7 +17,8 @@ import json
 
 import pandas as pd
 
-from harness.results import RESULTS, check_power
+from harness import platform
+from harness.results import check_power, results_dir
 from harness.server import ServerConfig
 from phase1.runner import RunConfig, execute
 
@@ -51,22 +52,25 @@ def main():
     p.add_argument("--groups", nargs="*", default=list(groups), choices=list(groups))
     p.add_argument("--redo", action="store_true", help="rerun configs that already have results")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--allow-battery", action="store_true")
+    platform.add_argument(p)
     a = p.parse_args()
+    platform.apply(a)
     if not a.dry_run:
-        check_power()
+        check_power(a.allow_battery)
     for gname in a.groups:
         for cfg in groups[gname]:
-            done = (RESULTS / "phase1" / cfg.name / "meta.json").exists()
+            done = (results_dir() / "phase1" / cfg.name / "meta.json").exists()
             print(f"{gname:>16} {cfg.name:<18} {'skip (done)' if done and not a.redo else 'run'}")
             if a.dry_run or (done and not a.redo):
                 continue
             execute(copy.deepcopy(cfg))
     rows = []
-    for meta in sorted((RESULTS / "phase1").glob("*/meta.json")):
+    for meta in sorted((results_dir() / "phase1").glob("*/meta.json")):
         rows.append(json.loads(meta.read_text())["summary"])
     if rows:
-        pd.DataFrame(rows).to_csv(RESULTS / "phase1/summary.csv", index=False)
-        print(f"wrote {RESULTS / 'phase1/summary.csv'} ({len(rows)} runs)")
+        pd.DataFrame(rows).to_csv(results_dir() / "phase1/summary.csv", index=False)
+        print(f"wrote {results_dir() / 'phase1/summary.csv'} ({len(rows)} runs)")
 
 
 if __name__ == "__main__":

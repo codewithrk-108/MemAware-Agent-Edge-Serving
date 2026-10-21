@@ -9,7 +9,7 @@ import asyncio
 import numpy as np
 
 from harness.client import complete, new_session, random_tokens
-from harness.results import save
+from harness.results import results_dir, save
 from harness.server import Server, ServerConfig, ROOT
 from micro.common import PORT, parse_args
 
@@ -36,7 +36,7 @@ def main():
     args = parse_args(__doc__)
     lengths = [128, 1024, 8192] if args.quick else [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32000]
     cfg = ServerConfig(ctx=CTX, parallel=1, port=PORT)
-    with Server(cfg, ROOT / "results/micro/m2_prefill/server.log") as srv:
+    with Server(cfg, results_dir() / "micro/m2_prefill/server.log") as srv:
         rows = asyncio.run(bench(srv, lengths, 1 if args.quick else args.reps))
         save("micro", "m2_prefill", rows, {"description": __doc__, "server": srv.describe()})
 

@@ -11,8 +11,15 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-P1 = ROOT / "results/phase1"
+P1 = ROOT / "results/macos/phase1"
 FIGS = P1 / "figures"
+
+
+def select(platform_name: str):
+    # plotting reads results only, so any platform's results can be plotted on any machine
+    global P1, FIGS
+    P1 = ROOT / "results" / platform_name / "phase1"
+    FIGS = P1 / "figures"
 TRACES = {"syn": "synthetic mix", "ai": "AgentInstruct"}
 OUTCOMES = ["ok", "failed", "timeout_running", "timeout_queued"]
 
@@ -85,7 +92,7 @@ def concurrency(s: pd.DataFrame, lines: list):
                 a.set_xticks(n, n)
                 a.minorticks_off()
         fig.suptitle(f"FIFO baseline, {label}: {rows.n_tasks.iloc[0]} tasks at {rows.arrival_rate.iloc[0]} tasks/s, "
-                     f"KV budget {rows.ctx.iloc[0]} tokens")
+                     f"KV budget {rows.ctx.iloc[0]} tokens [{P1.parent.name}]")
         savefig(fig, f"concurrency_{tr}")
 
         # completion-time breakdown -> dominant bottleneck per N
@@ -172,6 +179,11 @@ def per_class(s: pd.DataFrame):
 
 
 def main():
+    import argparse
+    from harness.platform import PLATFORMS, DEFAULT
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--platform", choices=PLATFORMS, default=DEFAULT, help="whose results to plot")
+    select(ap.parse_args().platform)
     s = summaries()
     if s.empty:
         print("no phase1 results yet")

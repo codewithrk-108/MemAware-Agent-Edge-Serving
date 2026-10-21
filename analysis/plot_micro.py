@@ -9,8 +9,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-MICRO = ROOT / "results/micro"
+MICRO = ROOT / "results/macos/micro"
 FIGS = MICRO / "figures"
+
+
+def select(platform_name: str):
+    # plotting reads results only, so any platform's results can be plotted on any machine
+    global MICRO, FIGS
+    MICRO = ROOT / "results" / platform_name / "micro"
+    FIGS = MICRO / "figures"
 
 
 def load(name: str):
@@ -165,6 +172,11 @@ def m6(lines: list):
 
 
 def main():
+    import argparse
+    from harness.platform import PLATFORMS, DEFAULT
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--platform", choices=PLATFORMS, default=DEFAULT, help="whose results to plot")
+    select(ap.parse_args().platform)
     lines = ["| bench | metric | result |", "|---|---|---|"]
     for f in (m1, m2, m3, m4, m5, m6):
         try:

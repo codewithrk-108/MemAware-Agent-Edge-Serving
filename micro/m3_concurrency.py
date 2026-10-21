@@ -9,7 +9,7 @@ import asyncio
 import numpy as np
 
 from harness.client import complete, new_session, random_tokens
-from harness.results import save
+from harness.results import results_dir, save
 from harness.server import Server, ServerConfig, ROOT
 from micro.common import PORT, now, parse_args
 
@@ -55,7 +55,7 @@ def main():
     bs = [1, 4, 16] if args.quick else [1, 2, 4, 8, 16, 32]
     ctx = MAX_B * (max(prompt_lens) + N_PREDICT + 64)
     cfg = ServerConfig(ctx=ctx, parallel=MAX_B, port=PORT)
-    with Server(cfg, ROOT / "results/micro/m3_concurrency/server.log") as srv:
+    with Server(cfg, results_dir() / "micro/m3_concurrency/server.log") as srv:
         rows = asyncio.run(bench(srv, prompt_lens, bs, 1 if args.quick else 2))
         save("micro", "m3_concurrency", rows, {"description": __doc__, "server": srv.describe(), "n_predict": N_PREDICT})
 

@@ -18,9 +18,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from harness import platform
 from harness.client import complete, new_session
 from harness.memory import MiB
-from harness.results import RESULTS, check_power, environment
+from harness.results import check_power, environment, results_dir
 from harness.server import Server, ServerConfig
 from workloads.trace import load
 
@@ -164,6 +165,8 @@ def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.D
         "prefill_tokens_computed": int(rok.prompt_n.sum()) if len(rok) else 0,
         "requests": len(reqs), "requests_failed": int(reqs.error.notna().sum()) if len(reqs) else 0,
         "peak_footprint_mib": float(mem.footprint_mib.max()) if len(mem) else float("nan"),
+        "peak_host_mib": float(mem.rss_mib.max()) if len(mem) else float("nan"),
+        "peak_gpu_mib": float(mem.gpu_mib.max()) if len(mem) else float("nan"),
         "start_footprint_mib": float(mem.footprint_mib.iloc[0]) if len(mem) else float("nan"),
         "span_s": float(span),
         "srv_prompt_tokens_cached_total": metrics.get("prompt_tokens_cached_total"),
@@ -171,14 +174,14 @@ def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.D
 
 
 def execute(cfg: RunConfig, group: str = "phase1") -> dict:
-    out = RESULTS / group / cfg.name
+    out = results_dir() / group / cfg.name
     out.mkdir(parents=True, exist_ok=True)
     cfg.server.parallel = cfg.concurrency
     with Server(cfg.server, out / "server.log", sample_interval=0.1) as srv:
         recs, requests, tl, t0 = asyncio.run(run(cfg, srv))
         metrics = srv.metrics()
-        mem = pd.DataFrame([{"t": s.t - t0, "footprint_mib": s.footprint / MiB, "rss_mib": s.rss / MiB}
-                            for s in srv.mem.samples])
+        mem = pd.DataFrame([{"t": s.t - t0, "footprint_mib": s.footprint / MiB, "rss_mib": s.rss / MiB,
+                             "gpu_mib": s.gpu / MiB} for s in srv.mem.samples])
 
     tasks = pd.DataFrame([asdict(r) for r in recs])
     tasks["queue_s"] = tasks.admit - tasks.arrival
@@ -218,7 +221,9 @@ def main():
     p.add_argument("--deadline", type=float, default=240.0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--allow-battery", action="store_true")
+    platform.add_argument(p)
     a = p.parse_args()
+    platform.apply(a)
     check_power(a.allow_battery)
     cfg = RunConfig(name=a.name, trace=a.trace, n_tasks=a.n_tasks, arrival_rate=a.rate, concurrency=a.concurrency,
                     delay_scale=a.delay_scale, cache_prompt=not a.no_cache_prompt, deadline_s=a.deadline, seed=a.seed,

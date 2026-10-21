@@ -10,7 +10,7 @@ import asyncio
 import numpy as np
 
 from harness.client import complete, new_session, random_tokens
-from harness.results import save
+from harness.results import results_dir, save
 from harness.server import Server, ServerConfig, ROOT
 from micro.common import PORT, parse_args, settle
 
@@ -25,7 +25,7 @@ async def fill(srv: Server, n_ctx_slot: int) -> dict:
 
 def run_config(name: str, cfg: ServerConfig) -> dict:
     cfg.port, cfg.verbose = PORT, True
-    log = ROOT / "results/micro/m1_memory/logs" / f"{name}.log"
+    log = results_dir() / "micro/m1_memory/logs" / f"{name}.log"
     with Server(cfg, log) as srv:
         asyncio.run(settle(1.0))
         idle = srv.memory_now()

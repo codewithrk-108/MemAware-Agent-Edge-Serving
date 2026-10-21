@@ -16,6 +16,11 @@ dependencies = [
 [project.scripts]
 agent-edge-serving = "agent_edge_serving:main"
 
+[project.optional-dependencies]
+cuda = [
+    "nvidia-ml-py>=13.615.71",
+]
+
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"

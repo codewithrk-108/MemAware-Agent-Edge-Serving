@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from harness import platform
 from harness.server import Server, ServerConfig
 from workloads.trace import Step, Task, describe, lognormal, save
 
@@ -117,7 +118,9 @@ def main():
     p.add_argument("--spec", type=Path, default=HERE / "agentinstruct.yaml")
     p.add_argument("--raw", type=Path, default=ROOT / "data/raw/AgentInstruct")
     p.add_argument("--out", type=Path, default=ROOT / "data/traces/agentinstruct.jsonl")
+    platform.add_argument(p)
     a = p.parse_args()
+    platform.apply(a)
     spec = yaml.safe_load(a.spec.read_text())
     with Server(ServerConfig(ctx=2048, parallel=1, port=8095), ROOT / "results/_logs/tokenizer.log") as srv:
         tasks, dropped = build(spec, srv.url, a.raw)

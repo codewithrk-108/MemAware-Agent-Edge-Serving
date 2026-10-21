@@ -1,14 +1,34 @@
 # Memory-aware agent edge serving: Phase 1 baseline
 
-Runtime: llama.cpp `llama-server` (Metal), model fixed to Llama-3.2-1B-Instruct Q8_0 for all main comparisons.
-Machine: Apple M5, 24 GB unified memory. **Run on AC power** - on battery macOS throttles the GPU and timings get
-2-3x slower and noisy; the scripts refuse to run on battery unless `--allow-battery` is passed.
+Runtime: llama.cpp `llama-server`, model fixed to Llama-3.2-1B-Instruct Q8_0 for all main comparisons.
+**Run on AC power** - on battery laptops throttle the GPU and timings get 2-3x slower and noisy; the scripts
+refuse to run on battery unless `--allow-battery` is passed.
+
+## Platforms
+
+Every entry point takes `--platform` (or `AES_PLATFORM=`), default `macos`. Results go to `results/<platform>/`,
+so runs from different machines never mix.
+
+| | `macos` (default) | `linux-cuda` |
+|---|---|---|
+| hardware | Apple Silicon, Metal (tested: M5, 24 GB) | Ubuntu, NVIDIA GPU |
+| llama.cpp build | `cmake -B build` | `cmake -B build -DGGML_CUDA=ON` |
+| memory reported | `phys_footprint`: unified memory incl. Metal buffers, kernel-tracked peak | host RSS (peak: `VmHWM`) + the server's GPU memory from NVML, and their total |
+| extra setup | - | `uv sync --extra cuda` (NVML bindings); falls back to `nvidia-smi` |
+| power check | `pmset` | `/sys/class/power_supply` (servers: always AC) |
+
+On `linux-cuda`, KV cache and weights live in GPU memory while the host prompt cache (`--cache-ram`) lives in
+host RAM, so check `peak_gpu_mib` and `peak_host_mib` separately. Pick the GPU with `CUDA_VISIBLE_DEVICES`.
+If NVML cannot see the server's process (containers with their own pid namespace), whole-GPU usage is used and
+`gpu_memory_scope: device` is recorded in `meta.json` - keep the GPU otherwise idle then.
+The linux-cuda path is written against NVML and llama.cpp's CUDA log format but has not been run on hardware yet:
+check `results/linux-cuda/micro/m1_memory` (KV and weights should appear as GPU memory) before trusting the rest.
 
 ## Layout
 
 | path | content |
 |---|---|
-| `harness/` | llama-server launcher, streaming client, macOS memory probe (`phys_footprint` incl. Metal + kernel-tracked peak) |
+| `harness/` | llama-server launcher, streaming client, per-platform memory probe, `--platform` handling |
 | `micro/` | microbenchmarks M1-M6: isolate one runtime property each |
 | `workloads/` | workload definitions and trace builders (synthetic mix, AgentInstruct) |
 | `phase1/` | FIFO runner with fixed concurrency, experiment grid |
@@ -28,7 +48,17 @@ uv run python -m workloads.build_synthetic           # data/traces/synthetic.jso
 hf download zai-org/AgentInstruct --repo-type dataset --local-dir data/raw/AgentInstruct
 uv run python -m workloads.build_agentinstruct       # data/traces/agentinstruct.jsonl
 uv run python -m phase1.sweep                        # 20 runs, ~2 h, resumes if interrupted
-uv run python -m analysis.plot_phase1                # results/phase1/figures, summary.md
+uv run python -m analysis.plot_phase1                # results/macos/phase1/figures, summary.md
+```
+
+On Ubuntu + NVIDIA add `--platform linux-cuda` to every command (and `--extra cuda` to `uv sync`):
+
+```bash
+uv sync --extra cuda
+./micro/run_all.sh --platform linux-cuda
+uv run python -m workloads.build_agentinstruct --platform linux-cuda
+uv run python -m phase1.sweep --platform linux-cuda
+uv run python -m analysis.plot_phase1 --platform linux-cuda   # plotting also works on another machine
 ```
 
 Paths can be overridden with `LLAMA_SERVER=` and `MODEL=`.

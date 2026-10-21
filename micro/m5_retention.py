@@ -12,7 +12,7 @@ import asyncio
 import numpy as np
 
 from harness.client import complete, new_session, random_tokens
-from harness.results import save
+from harness.results import results_dir, save
 from harness.server import Server, ServerConfig, ROOT
 from micro.common import PORT, now, parse_args, settle
 
@@ -56,7 +56,7 @@ async def run_sessions(srv: Server, n_sessions: int, n_steps: int, gap_s: float,
 def run(config: str, n_sessions: int, n_steps: int, gap_s: float, experiment: str) -> list:
     kvu, ram, idle = CONFIGS[config]
     cfg = ServerConfig(ctx=CTX, parallel=SLOTS, kv_unified=kvu, cache_ram=ram, cache_idle_slots=idle, port=PORT)
-    log = ROOT / f"results/micro/m5_retention/logs/{experiment}_{config}_S{n_sessions}.log"
+    log = results_dir() / f"micro/m5_retention/logs/{experiment}_{config}_S{n_sessions}.log"
     with Server(cfg, log) as srv:
         base = srv.memory_now()["footprint_mib"]
         rows = asyncio.run(run_sessions(srv, n_sessions, n_steps, gap_s, seed=n_sessions))

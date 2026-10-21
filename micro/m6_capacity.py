@@ -11,7 +11,7 @@ import asyncio
 import numpy as np
 
 from harness.client import complete, new_session, random_tokens
-from harness.results import save
+from harness.results import results_dir, save
 from harness.server import Server, ServerConfig, ROOT
 from micro.common import PORT, now, parse_args
 
@@ -51,7 +51,7 @@ async def burst(srv: Server, rng, b: int, prompt_len: int) -> list:
 def run(mode: str, lengths: list, bs: list) -> list:
     cfg = ServerConfig(ctx=CTX, parallel=SLOTS, kv_unified=(mode == "unified"), cache_ram=0, port=PORT)
     rows = []
-    with Server(cfg, ROOT / f"results/micro/m6_capacity/logs/{mode}.log") as srv:
+    with Server(cfg, results_dir() / f"micro/m6_capacity/logs/{mode}.log") as srv:
         rng = np.random.default_rng(6)
         for L in lengths:
             for b in bs:

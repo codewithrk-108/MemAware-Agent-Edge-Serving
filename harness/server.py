@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from . import platform
 from .memory import MemSampler, MiB, sample
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,13 +52,16 @@ class ServerConfig:
         return a + list(self.extra)
 
 
-# lines of the -v startup log that give the static memory breakdown
+# lines of the -v startup log that give the static memory breakdown; device names: MTL0 (Metal), CUDA0..n (NVIDIA),
+# host buffers: CPU, CPU_Mapped, CUDA_Host. Values are summed over devices (multi-GPU splits the model).
+_GPU_DEV = r"((?:MTL|CUDA)\d+)(?:_Mapped)?"
+_CPU_DEV = r"(CPU|CUDA_Host)(?:_Mapped)?"
 _BREAKDOWN = {
-    "model_gpu_mib":   re.compile(r"MTL0(?:_Mapped)? model buffer size =\s+([\d.]+) MiB"),
-    "model_cpu_mib":   re.compile(r"CPU(?:_Mapped)? model buffer size =\s+([\d.]+) MiB"),
-    "kv_mib":          re.compile(r"llama_kv_cache: size =\s+([\d.]+) MiB"),
-    "compute_gpu_mib": re.compile(r"MTL0 compute buffer size =\s+([\d.]+) MiB"),
-    "compute_cpu_mib": re.compile(r"CPU compute buffer size =\s+([\d.]+) MiB"),
+    "model_gpu_mib":   re.compile(_GPU_DEV + r" model buffer size =\s+([\d.]+) MiB"),
+    "model_cpu_mib":   re.compile(_CPU_DEV + r" model buffer size =\s+([\d.]+) MiB"),
+    "kv_mib":          re.compile(r"llama_kv_cache: ()size =\s+([\d.]+) MiB"),
+    "compute_gpu_mib": re.compile(_GPU_DEV + r" compute buffer size =\s+([\d.]+) MiB"),
+    "compute_cpu_mib": re.compile(_CPU_DEV + r" compute buffer size =\s+([\d.]+) MiB"),
 }
 
 
@@ -109,7 +113,8 @@ class Server:
 
     def memory_now(self) -> dict:
         s = sample(self.proc.pid)
-        return {"footprint_mib": s.footprint / MiB, "peak_footprint_mib": s.peak_footprint / MiB, "rss_mib": s.rss / MiB}
+        return {"footprint_mib": s.footprint / MiB, "peak_footprint_mib": s.peak_footprint / MiB,
+                "rss_mib": s.rss / MiB, "gpu_mib": s.gpu / MiB}
 
     def breakdown(self) -> dict:
         """Static allocations from the startup log (needs verbose=True)."""
@@ -117,10 +122,10 @@ class Server:
         text = self.log_path.read_text(errors="replace")
         out = {}
         for key, rx in _BREAKDOWN.items():
-            vals = [float(v) for v in rx.findall(text)]
-            if vals:
-                # the server sizes the model in a dry run first, the last match is the real load
-                out[key] = vals[-1]
+            # the server sizes the model in a dry run first, the last value per device is the real load
+            last = {dev: float(v) for dev, v in rx.findall(text)}
+            if last:
+                out[key] = sum(last.values())
         return out
 
     def metrics(self) -> dict:
@@ -136,4 +141,5 @@ class Server:
     def describe(self) -> dict:
         d = asdict(self.cfg)
         d["args"] = " ".join(self.cfg.args())
+        d["platform"] = platform.current()
         return d
