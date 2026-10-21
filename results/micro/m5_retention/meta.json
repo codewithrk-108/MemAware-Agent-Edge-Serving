@@ -1,0 +1,44 @@
+{
+  "env": {
+    "timestamp": "2026-10-20T19:00:46",
+    "machine": "Apple M5",
+    "memory_gib": 24.0,
+    "os": "Darwin 26.7.1",
+    "llama_cpp_commit": "1242be6",
+    "model": "Llama-3.2-1B-Instruct-Q8_0.gguf",
+    "model_bytes": 1321083008
+  },
+  "description": "M5: do retained contexts survive while an agent is idle, and what does keeping them cost?\n\nS agent sessions take turns (one request at a time, round robin), so between two steps of a session the other\nS-1 sessions run - the situation of an agent waiting on a tool. Each step resends the full history plus a tool\nresult. The cache hit ratio (cache_n / prompt tokens) shows whether the session's context was still cached:\nin a slot, in the host prompt cache (--cache-ram), or not at all. Memory is sampled after every request.\nA second experiment adds wall-clock idle gaps with no interleaving, to separate idle time from interleaving.\n",
+  "ctx": 16384,
+  "slots": 4,
+  "n_init": 2048,
+  "n_gen": 32,
+  "n_tool": 64,
+  "configs": {
+    "unified+ram": [
+      true,
+      null,
+      null
+    ],
+    "unified+ram-noidle": [
+      true,
+      null,
+      false
+    ],
+    "unified-noram": [
+      true,
+      0,
+      null
+    ],
+    "partitioned-noram": [
+      false,
+      0,
+      null
+    ],
+    "partitioned+ram": [
+      false,
+      null,
+      null
+    ]
+  }
+}

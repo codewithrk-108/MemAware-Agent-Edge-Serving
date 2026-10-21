@@ -1,0 +1,4 @@
+n_prompt,n_predict_req,cache_prompt,t_send,t_first,t_end,error,status,e2e_s,ttft_s,rep,prefill_tok_s,prompt_n,cache_n,prompt_ms,predicted_n,predicted_ms,tpot_ms,id_slot,truncated,stop_type
+128,1,False,240933.856344083,,240933.856592458,ServerDisconnectedError: Server disconnected,,0.0002483749995008111,,0,,,,,,,,,,
+1024,1,False,240933.857303,240935.321528541,240935.321748583,,200.0,1.4644455829984508,1.4642255410144571,0,700.077596491408,1024.0,0.0,1462.695,1.0,0.001,0.0,0.0,False,limit
+8192,1,False,240935.32230525,,240935.323253291,ServerDisconnectedError: Server disconnected,,0.0009480409789830446,,0,,,,,,,,,,

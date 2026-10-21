@@ -1,0 +1,26 @@
+{
+  "env": {
+    "timestamp": "2026-10-20T18:13:30",
+    "machine": "Apple M5",
+    "memory_gib": 24.0,
+    "os": "Darwin 26.7.1",
+    "llama_cpp_commit": "1242be6",
+    "model": "Llama-3.2-1B-Instruct-Q8_0.gguf",
+    "model_bytes": 1321083008
+  },
+  "description": "M2: prefill cost vs prompt length.\n\nOne request at a time, unique prompts, prompt caching off. TTFT is the cost of admitting a request with a\nlong (or discarded and recomputed) context.\n",
+  "server": {
+    "ctx": 32768,
+    "parallel": 1,
+    "kv_unified": true,
+    "cache_ram": null,
+    "cache_idle_slots": null,
+    "mmap": true,
+    "batch": null,
+    "ubatch": null,
+    "extra": [],
+    "port": 8090,
+    "verbose": false,
+    "args": "/Users/rohankumar/Desktop/RohanCode/llama.cpp/build/bin/llama-server -m /Users/rohankumar/Desktop/RohanCode/models/Llama-3.2-1B-Instruct-Q8_0.gguf -c 32768 -np 1 --port 8090 --metrics -ngl 999 -kvu"
+  }
+}

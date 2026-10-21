@@ -1,0 +1,14 @@
+{
+  "env": {
+    "timestamp": "2026-10-20T20:54:04",
+    "machine": "Apple M5",
+    "power": "AC",
+    "memory_gib": 24.0,
+    "os": "Darwin 26.7.1",
+    "llama_cpp_commit": "1242be6",
+    "model": "Llama-3.2-1B-Instruct-Q8_0.gguf",
+    "model_bytes": 1321083008
+  },
+  "description": "M1: static memory cost of the runtime.\n\nFor each server configuration: the allocations the runtime reports at startup, the process memory when idle,\nand the process memory after one request has filled the whole context. Answers whether KV memory is paid at\nstartup (sized by -c) or as the context fills, and what slots and mmap cost.\n",
+  "n_predict": 8
+}
