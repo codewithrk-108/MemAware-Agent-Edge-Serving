@@ -310,3 +310,48 @@ B and C can run before A2
 
 The `fifo-improved` branch instead puts the pending placeholder at the tail and permits workers to skip it, avoiding
 head-of-line blocking.
+
+## Proposed main-branch change: ready-time FIFO without placeholders
+
+The requested next revision differs from both historical variants above. A task should be completely absent from
+the runnable FIFO while its tool is outstanding. Its asynchronous tool coroutine owns the waiting state. Once the
+tool resolves, the coroutine appends the next step's input tokens to persistent history and adds the task to the
+FIFO tail as runnable work.
+
+```text
+A1 decodes -> A enters tool_waiting outside FIFO
+ready FIFO remains [B1, C1, ...]
+B1 and C1 can decode
+A tool resolves -> append response -> enqueue A2 at FIFO tail
+```
+
+### Repository evidence
+
+- `RequestTaskState.history` and `next_step` already preserve task state outside a worker.
+- `wait_for_tool` already executes as a separately tracked asyncio task.
+- `Timeline.tool_waiting` already represents the required outside-FIFO state.
+- The current blocking behavior comes only from `put_pending_head`, head-only `take`, `resolve_to_tail`, and their
+  queue/timeline updates.
+- Existing deterministic scheduler tests provide the correct integration point for ordering, concurrency,
+  history, timeout, and shutdown validation.
+
+### Recommended minimal surface
+
+Modify `phase1/runner.py`, `tests/test_phase1_scheduler.py`, `README.md`, and these planning artifacts. Keep the
+harness, model configuration, workloads, sweep grid, result schemas, analysis code, microbenchmarks, and
+`fifo-improved` branch unchanged.
+
+### Constraints and risks
+
+- Tool timeout occurs outside FIFO and must not remove/decrement a queue entry.
+- A resolved task must receive a new tail position based on tool-completion time.
+- Zero-delay tools should still enqueue through the asynchronous path so already-ready work keeps FIFO priority.
+- Increased interleaving can improve utilization while reducing prompt-cache reuse.
+- Old head-blocking results and new ready-time results require separate provenance or regeneration.
+
+### Implementation outcome
+
+The ready-only FIFO design was implemented as planned. Pending-head insertion, in-place activation, and queue
+removal during tool timeout were removed. Tool completion now appends the response and performs the only resumed
+step enqueue. Deterministic tests confirm that ready requests continue while tools run and resumed steps join the
+tail based on tool-completion time.

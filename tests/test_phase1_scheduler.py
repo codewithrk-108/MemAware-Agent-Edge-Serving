@@ -55,7 +55,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([p[0] for p in fake.calls], [10, 10, 20])
         self.assertTrue(all(r.status == "ok" for r in recs))
 
-    async def test_pending_head_blocks_other_task_until_tool_resolves(self):
+    async def test_other_task_runs_before_tool_resolves(self):
         tasks = [
             task("a", [Step([10], 1, 0.02), Step([11], 1, None)]),
             task("b", [Step([20], 1, None)]),
@@ -65,7 +65,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         with patch("phase1.runner.complete", fake):
             recs, _, timeline, _ = await run_request_fifo(cfg, self.srv, tasks, np.array([0.0, 0.001]))
         self.assertEqual([p[0] for p in fake.calls], [10, 20, 10])
-        self.assertGreaterEqual(fake.call_times[1] - fake.call_times[0], 0.018)
+        self.assertLess(fake.call_times[1] - fake.call_times[0], 0.015)
         self.assertEqual(fake.calls[2], [10, 910, 11])
         self.assertTrue(any(row["tool_waiting"] == 1 for row in timeline.rows))
         self.assertTrue(all(r.status == "ok" for r in recs))
@@ -82,7 +82,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
             await run_request_fifo(cfg, self.srv, tasks, np.array([0.0, 0.001, 0.005]))
         self.assertEqual([p[0] for p in fake.calls], [10, 20, 30, 10])
 
-    async def test_pending_head_blocks_all_idle_workers(self):
+    async def test_tool_wait_does_not_block_idle_workers(self):
         tasks = [
             task("a", [Step([10], 1, 0.03), Step([11], 1, None)]),
             task("b", [Step([20], 1, None)]),
@@ -94,7 +94,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
             await run_request_fifo(cfg, self.srv, tasks, np.zeros(3))
         a_start = fake.call_times[[p[0] for p in fake.calls].index(10)]
         c_start = fake.call_times[[p[0] for p in fake.calls].index(30)]
-        self.assertGreaterEqual(c_start - a_start, 0.028)
+        self.assertLess(c_start - a_start, 0.02)
 
     async def test_tool_wait_deadline_finishes_without_next_request(self):
         tasks = [task("a", [Step([10], 1, 0.05), Step([11], 1, None)])]
