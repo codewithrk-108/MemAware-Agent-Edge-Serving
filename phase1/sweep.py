@@ -7,6 +7,7 @@
     budget_syn     KV budget 8k / 32k tokens at N = 16      -> memory pressure: failures vs budget
     idle_syn       tool delays x0 / x4 at N = 8             -> cost of idle periods between agent steps
     retention_*    host prompt cache off, prefix reuse off  -> do retained contexts / reusable prefixes matter
+    scheduler       task FIFO vs request FIFO at N = 8       -> does releasing workers during tools help
 
 Runs already in results/<platform>/phase1 are skipped, so an interrupted sweep resumes.
 """
@@ -42,6 +43,10 @@ def grid() -> dict:
         "concurrency_ai": [base(f"ai_N{n}", AI, concurrency=n) for n in CONCURRENCY],
         "retention_ai": [base("ai_N8_noram", AI, concurrency=8, cache_ram=0),
                          base("ai_N8_noreuse", AI, concurrency=8, cache_prompt=False)],
+        "scheduler": [base("syn_N8_task", SYN, concurrency=8, scheduler="task"),
+                      base("syn_N8_request", SYN, concurrency=8, scheduler="request"),
+                      base("ai_N8_task", AI, concurrency=8, scheduler="task"),
+                      base("ai_N8_request", AI, concurrency=8, scheduler="request")],
     }
     return g
 

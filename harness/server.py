@@ -15,7 +15,7 @@ from .memory import MemSampler, MiB, sample
 
 ROOT = Path(__file__).resolve().parents[1]
 LLAMA_SERVER = Path(os.environ.get("LLAMA_SERVER", ROOT.parent / "llama.cpp/build/bin/llama-server"))
-MODEL = Path(os.environ.get("MODEL", ROOT.parent / "models/Llama-3.2-1B-Instruct-Q8_0.gguf"))
+MODEL = Path(os.environ.get("MODEL", ROOT.parent / "models/Qwen3-0.6B-Q8_0.gguf"))
 
 
 @dataclass

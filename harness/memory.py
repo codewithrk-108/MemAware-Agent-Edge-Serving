@@ -133,8 +133,10 @@ def _sample_linux_cuda(pid: int) -> MemSample:
     rss = psutil.Process(pid).memory_info().rss
     r = _nvml_used(pid) or _smi_used(pid)
     gpu, found, device_used = r
+    # set on every sample: a sweep starts many servers in one process, the scope must describe the current one
+    _gpu_scope = "process" if found else "device"
     if not found:
-        _gpu_scope, gpu = "device", device_used
+        gpu = device_used
     _gpu_peak[pid] = max(_gpu_peak.get(pid, 0), gpu)
     return MemSample(time.monotonic(), rss + gpu, _vm_hwm(pid) + _gpu_peak[pid], rss, gpu)
 

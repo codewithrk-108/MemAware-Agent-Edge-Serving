@@ -7,7 +7,7 @@ from typing import Optional
 import aiohttp
 import numpy as np
 
-# Llama 3 ids below 128000 are ordinary tokens, this range avoids special and byte tokens
+# Qwen3 has ordinary vocabulary tokens in this range; avoid special and byte-token regions.
 _TOKEN_LO, _TOKEN_HI = 1000, 30000
 
 

@@ -1,9 +1,10 @@
 """Phase 1 baseline: FIFO queue with fixed concurrency in front of llama-server.
 
-Tasks arrive open-loop (Poisson) and wait in one FIFO queue. N workers each take the oldest waiting task and run it
-to completion: every step sends the full history (the model's own tokens included) and then waits for the tool,
-holding its worker - an admitted task keeps its concurrency slot through its idle periods. llama-server gets N
-slots, so the only queue that decides admission is this one.
+Tasks arrive open-loop (Poisson) and wait in one FIFO queue. The default request scheduler runs one model step per
+dequeue and releases its worker while the tool runs outside the FIFO. When the tool finishes, its response is
+appended and the next step joins the FIFO tail as runnable work. The optional task scheduler has N workers run
+whole tasks, holding workers through tool waits.
+llama-server gets N slots, so the Python scheduler decides admission.
 
 A task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.
 """
@@ -39,6 +40,7 @@ class RunConfig:
     cache_prompt: bool = True        # let the server reuse cached prefixes
     deadline_s: float = 240.0        # per task, from arrival
     request_timeout_s: float = 180.0
+    scheduler: str = "request"       # request: one ready step at a time; task: hold worker through tools
     seed: int = 0
     server: ServerConfig = field(default_factory=ServerConfig)
 
@@ -56,6 +58,7 @@ class TaskRecord:
     error: Optional[str] = None
     steps_done: int = 0
     tool_s: float = 0.0
+    ready_queue_s: float = 0.0
     worker: int = -1
 
 
@@ -63,12 +66,56 @@ class Timeline:
     """Queue length and running tasks over time, one row per change."""
 
     def __init__(self, t0: float):
-        self.t0, self.rows, self.queued, self.running = t0, [], 0, 0
+        self.t0, self.rows = t0, []
+        self.queued, self.runnable, self.running, self.tool_waiting = 0, 0, 0, 0
 
-    def mark(self, now: float, dq: int = 0, dr: int = 0):
+    def mark(self, now: float, dq: int = 0, dr: int = 0, dready: int = 0, dtool: int = 0):
         self.queued += dq
+        self.runnable += dready
         self.running += dr
-        self.rows.append({"t": now - self.t0, "queued": self.queued, "running": self.running})
+        self.tool_waiting += dtool
+        self.rows.append({"t": now - self.t0, "queued": self.queued, "runnable": self.runnable,
+                          "running": self.running, "tool_waiting": self.tool_waiting})
+
+
+@dataclass
+class RequestTaskState:
+    task_index: int
+    next_step: int = 0
+    history: list = field(default_factory=list)
+    enqueued_at: float = 0.0
+    runnable_at: Optional[float] = None
+    runnable: bool = False
+    terminal: bool = False
+
+
+class RunnableFifo:
+    """FIFO containing only model steps whose inputs are ready."""
+
+    def __init__(self):
+        self.entries = []
+        self.closed = False
+        self.changed = asyncio.Condition()
+
+    async def put(self, state: RequestTaskState):
+        async with self.changed:
+            state.runnable = True
+            self.entries.append(state)
+            self.changed.notify_all()
+
+    async def take(self) -> Optional[RequestTaskState]:
+        async with self.changed:
+            while True:
+                if self.entries:
+                    return self.entries.pop(0)
+                if self.closed:
+                    return None
+                await self.changed.wait()
+
+    async def close(self):
+        async with self.changed:
+            self.closed = True
+            self.changed.notify_all()
 
 
 async def run_task(cfg: RunConfig, session, url: str, task, rec: TaskRecord, requests: list, t0: float):
@@ -94,15 +141,7 @@ async def run_task(cfg: RunConfig, session, url: str, task, rec: TaskRecord, req
     rec.finish = loop.time()
 
 
-async def run(cfg: RunConfig, srv: Server) -> tuple:
-    rng = np.random.default_rng(cfg.seed)
-    pool = load(ROOT / cfg.trace)
-    idx = rng.choice(len(pool), size=cfg.n_tasks, replace=cfg.n_tasks > len(pool))
-    tasks = [pool[i] for i in idx]
-    gaps = rng.exponential(1.0 / cfg.arrival_rate, size=len(tasks)) if cfg.arrival_rate > 0 else np.zeros(len(tasks))
-    gaps[0] = 0.0
-    offsets = np.cumsum(gaps)
-
+async def run_task_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) -> tuple:
     loop = asyncio.get_running_loop()
     t0 = loop.time()
     queue: asyncio.Queue = asyncio.Queue()   # FIFO
@@ -116,7 +155,7 @@ async def run(cfg: RunConfig, srv: Server) -> tuple:
                 await asyncio.sleep(max(0.0, t0 + off - loop.time()))
                 recs[i].arrival = loop.time()
                 queue.put_nowait(i)
-                tl.mark(loop.time(), dq=+1)
+                tl.mark(loop.time(), dq=+1, dready=+1)
             for _ in range(cfg.concurrency):
                 queue.put_nowait(None)   # sentinels come after every task, FIFO keeps that order
 
@@ -124,7 +163,8 @@ async def run(cfg: RunConfig, srv: Server) -> tuple:
             while (i := await queue.get()) is not None:
                 rec = recs[i]
                 rec.admit, rec.worker = loop.time(), w
-                tl.mark(rec.admit, dq=-1)
+                rec.ready_queue_s = rec.admit - rec.arrival
+                tl.mark(rec.admit, dq=-1, dready=-1)
                 left = cfg.deadline_s - (rec.admit - rec.arrival)
                 if left <= 0:
                     rec.status = "timeout_queued"
@@ -142,13 +182,151 @@ async def run(cfg: RunConfig, srv: Server) -> tuple:
     return recs, requests, tl, t0
 
 
+async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) -> tuple:
+    loop = asyncio.get_running_loop()
+    t0 = loop.time()
+    scheduler = RunnableFifo()
+    states = [RequestTaskState(i) for i in range(len(tasks))]
+    recs = [TaskRecord(t.task_id, t.cls, t.n_steps, t.total_tokens) for t in tasks]
+    requests = []
+    tl = Timeline(t0)
+    all_done = asyncio.Event()
+    completed = 0
+    tool_jobs = []
+
+    if not states:
+        all_done.set()
+
+    def finish(state: RequestTaskState, status: str, error: Optional[str] = None) -> bool:
+        nonlocal completed
+        if state.terminal:
+            return False
+        state.terminal = True
+        rec = recs[state.task_index]
+        rec.status, rec.error, rec.finish = status, error, loop.time()
+        completed += 1
+        if completed == len(states):
+            all_done.set()
+        return True
+
+    async def wait_for_tool(state: RequestTaskState, delay: float):
+        rec = recs[state.task_index]
+        left = cfg.deadline_s - (loop.time() - rec.arrival)
+        if left <= 0 or delay >= left:
+            if left > 0:
+                await asyncio.sleep(left)
+            tl.mark(loop.time(), dtool=-1)
+            finish(state, "timeout_queued", "deadline while waiting for tool")
+            return
+        await asyncio.sleep(delay)
+        if state.terminal:
+            return
+        step = tasks[state.task_index].steps[state.next_step]
+        state.history = state.history + step.input
+        state.enqueued_at = state.runnable_at = loop.time()
+        await scheduler.put(state)
+        tl.mark(loop.time(), dq=+1, dready=+1, dtool=-1)
+
+    async with new_session(limit=cfg.concurrency + 8) as session:
+        async def arrivals():
+            for i, off in enumerate(offsets):
+                await asyncio.sleep(max(0.0, t0 + off - loop.time()))
+                now = loop.time()
+                state, rec = states[i], recs[i]
+                rec.arrival = now
+                state.history = list(tasks[i].steps[0].input)
+                state.enqueued_at = state.runnable_at = now
+                await scheduler.put(state)
+                tl.mark(now, dq=+1, dready=+1)
+
+        async def worker(w: int):
+            while (state := await scheduler.take()) is not None:
+                now = loop.time()
+                rec = recs[state.task_index]
+                rec.worker = w
+                if rec.admit is None:
+                    rec.admit = now
+                wait_s = now - state.runnable_at
+                rec.ready_queue_s += wait_s
+                tl.mark(now, dq=-1, dready=-1)
+                left = cfg.deadline_s - (now - rec.arrival)
+                if left <= 0:
+                    finish(state, "timeout_queued", "deadline while queued")
+                    continue
+
+                task = tasks[state.task_index]
+                step_index = state.next_step
+                step = task.steps[step_index]
+                tl.mark(loop.time(), dr=+1)
+                try:
+                    r = await asyncio.wait_for(
+                        complete(session, srv.url, state.history, step.n_gen, cache_prompt=cfg.cache_prompt,
+                                 return_tokens=True, timeout=cfg.request_timeout_s),
+                        timeout=left,
+                    )
+                except asyncio.TimeoutError:
+                    tl.mark(loop.time(), dr=-1)
+                    finish(state, "timeout_running", "deadline during request")
+                    continue
+
+                r.update(task_id=task.task_id, cls=task.cls, step=step_index, worker=w,
+                         t_rel=r["t_send"] - t0, ready_queue_s=wait_s)
+                requests.append(r)
+                if r["error"]:
+                    tl.mark(loop.time(), dr=-1)
+                    finish(state, "failed", r["error"])
+                    continue
+
+                state.history = state.history + r["tokens"]
+                rec.steps_done = step_index + 1
+                state.next_step += 1
+                if state.next_step == len(task.steps):
+                    tl.mark(loop.time(), dr=-1)
+                    finish(state, "ok")
+                    continue
+
+                delay = (step.tool_delay_s or 0.0) * cfg.delay_scale
+                rec.tool_s += delay
+                state.enqueued_at, state.runnable_at = 0.0, None
+                tl.mark(loop.time(), dr=-1, dtool=+1)
+                job = asyncio.create_task(wait_for_tool(state, delay))
+                tool_jobs.append(job)
+
+        arrival_job = asyncio.create_task(arrivals())
+        workers = [asyncio.create_task(worker(w)) for w in range(cfg.concurrency)]
+        await arrival_job
+        await all_done.wait()
+        if tool_jobs:
+            await asyncio.gather(*tool_jobs)
+        await scheduler.close()
+        await asyncio.gather(*workers)
+    return recs, requests, tl, t0
+
+
+async def run(cfg: RunConfig, srv: Server) -> tuple:
+    if cfg.scheduler not in {"task", "request"}:
+        raise ValueError(f"unknown scheduler: {cfg.scheduler}")
+    rng = np.random.default_rng(cfg.seed)
+    pool = load(ROOT / cfg.trace)
+    idx = rng.choice(len(pool), size=cfg.n_tasks, replace=cfg.n_tasks > len(pool))
+    tasks = [pool[i] for i in idx]
+    gaps = rng.exponential(1.0 / cfg.arrival_rate, size=len(tasks)) if cfg.arrival_rate > 0 else np.zeros(len(tasks))
+    if len(gaps):
+        gaps[0] = 0.0
+    offsets = np.cumsum(gaps)
+    if cfg.scheduler == "request":
+        return await run_request_fifo(cfg, srv, tasks, offsets)
+    return await run_task_fifo(cfg, srv, tasks, offsets)
+
+
 def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.DataFrame, metrics: dict) -> dict:
     ok = tasks[tasks.status == "ok"]
     rok = reqs[reqs.error.isna()] if len(reqs) else reqs
     span = (tasks.finish.max() - tasks.arrival.min()) if len(tasks) else float("nan")
     q = lambda s, p: float(np.percentile(s, p)) if len(s) else float("nan")
     return {
-        "name": cfg.name, "trace": Path(cfg.trace).stem, "concurrency": cfg.concurrency, "ctx": cfg.server.ctx,
+        "name": cfg.name, "trace": Path(cfg.trace).stem, "scheduler": cfg.scheduler,
+        "concurrency": cfg.concurrency, "ctx": cfg.server.ctx,
         "arrival_rate": cfg.arrival_rate, "delay_scale": cfg.delay_scale, "cache_prompt": cfg.cache_prompt,
         "cache_ram": cfg.server.cache_ram, "n_tasks": len(tasks),
         "ok": len(ok), "failed": int((tasks.status == "failed").sum()),
@@ -157,6 +335,8 @@ def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.D
         "completion_p50_s": q(ok.completion_s, 50), "completion_p95_s": q(ok.completion_s, 95),
         "completion_p99_s": q(ok.completion_s, 99),
         "queue_p50_s": q(tasks.queue_s.dropna(), 50), "queue_p95_s": q(tasks.queue_s.dropna(), 95),
+        "ready_queue_p50_s": q(tasks.ready_queue_s.dropna(), 50),
+        "ready_queue_p95_s": q(tasks.ready_queue_s.dropna(), 95),
         "ttft_p50_s": q(rok.ttft_s.dropna(), 50), "ttft_p95_s": q(rok.ttft_s.dropna(), 95),
         "tpot_p50_ms": q(rok.tpot_ms.dropna(), 50),
         "throughput_tasks_min": len(ok) / span * 60 if span else float("nan"),
@@ -174,6 +354,8 @@ def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.D
 
 
 def execute(cfg: RunConfig, group: str = "phase1") -> dict:
+    if cfg.scheduler not in {"task", "request"}:
+        raise ValueError(f"unknown scheduler: {cfg.scheduler}")
     out = results_dir() / group / cfg.name
     out.mkdir(parents=True, exist_ok=True)
     cfg.server.parallel = cfg.concurrency
@@ -219,6 +401,7 @@ def main():
     p.add_argument("--no-cache-prompt", action="store_true")
     p.add_argument("--delay-scale", type=float, default=1.0)
     p.add_argument("--deadline", type=float, default=240.0)
+    p.add_argument("--scheduler", choices=("task", "request"), default="request")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--allow-battery", action="store_true")
     platform.add_argument(p)
@@ -226,7 +409,8 @@ def main():
     platform.apply(a)
     check_power(a.allow_battery)
     cfg = RunConfig(name=a.name, trace=a.trace, n_tasks=a.n_tasks, arrival_rate=a.rate, concurrency=a.concurrency,
-                    delay_scale=a.delay_scale, cache_prompt=not a.no_cache_prompt, deadline_s=a.deadline, seed=a.seed,
+                    delay_scale=a.delay_scale, cache_prompt=not a.no_cache_prompt, deadline_s=a.deadline,
+                    scheduler=a.scheduler, seed=a.seed,
                     server=ServerConfig(ctx=a.ctx, cache_ram=a.cache_ram, mmap=False))
     execute(cfg)
 
