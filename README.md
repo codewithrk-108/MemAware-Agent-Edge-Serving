@@ -64,11 +64,12 @@ Per request: TTFT, TPOT (client side), prompt tokens computed vs reused, errors.
 Per task: queueing time, completion time, service time, tool time, outcome.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
 
-The runner uses the `request` scheduler by default. In request mode, one worker executes one model step and is
-released while the following tool call runs. The task is
-not in the runnable FIFO during that wait. When the tool finishes, its response is appended to the task history
-and the next model step is appended to the tail of the FIFO. Other ready requests therefore use the server during
-the tool wait, and FIFO order is based on when each model step becomes ready.
+The runner uses the `request` scheduler by default. In request mode, one worker executes one model step and then
+places a pending placeholder at the head of the FIFO while the following tool call runs. Workers cannot skip a
+pending head, so later requests are blocked even if inference capacity is idle. When the tool finishes, its
+response is appended to task history and the placeholder moves from the head to the FIFO tail as runnable work.
+This deliberately models head-of-line blocking. The `fifo-improved` branch contains the alternative scheduler
+that puts pending placeholders at the tail and lets workers skip them.
 
 Run one configuration in request mode:
 

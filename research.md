@@ -292,19 +292,21 @@ No changes are needed in the harness client/server, trace schema, workload build
 - The same concurrency value means admitted tasks in task mode but active requests in request mode.
 - Integration tests depend on an external llama.cpp build/model, so scheduler correctness needs deterministic fake-completion tests.
 
-## Main-branch revision: ready-time request FIFO
+## Main-branch revision: head-of-line-blocking request FIFO
 
-On `main`, this is the default scheduler. A later model step does not enter FIFO when its tool call begins. The task remains in a separate
-tool-waiting state with no worker. When the tool finishes, the scheduler appends the tool-response tokens to the
-persistent task history and then appends the next model step to the FIFO tail as runnable work.
+On `main`, this is the default scheduler. After a model step makes a tool call, a pending placeholder for its next
+step is inserted at the FIFO head. It consumes no worker, but workers cannot skip it, so later ready entries are
+head-of-line blocked. When the tool finishes, the scheduler appends the tool-response tokens to persistent task
+history, removes the placeholder from its blocking position, and appends it to the FIFO tail as runnable work.
 
 This makes ordering conventional ready-time FIFO:
 
 ```text
-step A1 completes -> A waits outside FIFO for its tool
-step B becomes ready -> B enters FIFO
-A's tool completes -> append response -> A2 enters FIFO behind B
+step A1 completes -> A-pending enters FIFO head
+B and C remain behind A and cannot run
+A's tool completes -> append response -> move A2 to FIFO tail
+B and C can run before A2
 ```
 
-The simplified policy has no pending FIFO entries, no skip count, and no head-of-line question. Timeline
-`tool_waiting` counts tasks outside FIFO, while `queued` and `runnable` count ready model steps.
+The `fifo-improved` branch instead puts the pending placeholder at the tail and permits workers to skip it, avoiding
+head-of-line blocking.

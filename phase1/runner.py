@@ -1,9 +1,9 @@
 """Phase 1 baseline: FIFO queue with fixed concurrency in front of llama-server.
 
 Tasks arrive open-loop (Poisson) and wait in one FIFO queue. The default request scheduler runs one model step per
-dequeue, releases the worker while the tool runs, appends the tool response when it finishes, and then puts the
-next step at the tail of the FIFO as runnable work. The optional task scheduler has N workers run whole tasks,
-holding workers through tool waits.
+dequeue, then puts a pending placeholder at the queue head while its tool runs. That pending head blocks later
+requests. When the tool finishes, its response is appended and the step moves to the FIFO tail as runnable work.
+The optional task scheduler has N workers run whole tasks, holding workers through tool waits.
 llama-server gets N slots, so the Python scheduler decides admission.
 
 A task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.
@@ -89,7 +89,7 @@ class RequestTaskState:
 
 
 class RunnableFifo:
-    """FIFO of model steps whose inputs, including any tool response, are ready."""
+    """FIFO whose pending head blocks later entries until its tool resolves."""
 
     def __init__(self):
         self.entries = []
@@ -102,12 +102,35 @@ class RunnableFifo:
             self.entries.append(state)
             self.changed.notify_all()
 
+    async def put_pending_head(self, state: RequestTaskState):
+        async with self.changed:
+            state.runnable = False
+            self.entries.insert(0, state)
+            self.changed.notify_all()
+
+    async def resolve_to_tail(self, state: RequestTaskState) -> bool:
+        async with self.changed:
+            if state.terminal or state not in self.entries:
+                return False
+            self.entries.remove(state)
+            state.runnable = True
+            self.entries.append(state)
+            self.changed.notify_all()
+            return True
+
+    async def remove(self, state: RequestTaskState) -> bool:
+        async with self.changed:
+            if state not in self.entries:
+                return False
+            self.entries.remove(state)
+            self.changed.notify_all()
+            return True
+
     async def take(self) -> Optional[RequestTaskState]:
         async with self.changed:
             while True:
-                for i, state in enumerate(self.entries):
-                    if state.runnable:
-                        return self.entries.pop(i)
+                if self.entries and self.entries[0].runnable:
+                    return self.entries.pop(0)
                 if self.closed:
                     return None
                 await self.changed.wait()
@@ -215,7 +238,8 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
         if left <= 0 or delay >= left:
             if left > 0:
                 await asyncio.sleep(left)
-            tl.mark(loop.time(), dtool=-1)
+            if await scheduler.remove(state):
+                tl.mark(loop.time(), dq=-1, dtool=-1)
             finish(state, "timeout_queued", "deadline while waiting for tool")
             return
         await asyncio.sleep(delay)
@@ -224,8 +248,8 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
         step = tasks[state.task_index].steps[state.next_step]
         state.history = state.history + step.input
         state.enqueued_at = state.runnable_at = loop.time()
-        await scheduler.put(state, runnable=True)
-        tl.mark(loop.time(), dq=+1, dready=+1, dtool=-1)
+        if await scheduler.resolve_to_tail(state):
+            tl.mark(loop.time(), dready=+1, dtool=-1)
 
     async with new_session(limit=cfg.concurrency + 8) as session:
         async def arrivals():
@@ -288,7 +312,8 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
                 delay = (step.tool_delay_s or 0.0) * cfg.delay_scale
                 rec.tool_s += delay
                 state.enqueued_at, state.runnable_at = 0.0, None
-                tl.mark(loop.time(), dr=-1, dtool=+1)
+                await scheduler.put_pending_head(state)
+                tl.mark(loop.time(), dq=+1, dr=-1, dtool=+1)
                 job = asyncio.create_task(wait_for_tool(state, delay))
                 tool_jobs.append(job)
 
