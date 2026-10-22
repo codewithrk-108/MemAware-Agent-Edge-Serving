@@ -1,0 +1,66 @@
+{
+  "source": "pagarsky/agent-trace",
+  "source_files": [
+    {
+      "url": "https://huggingface.co/datasets/pagarsky/agent-trace/resolve/main/datasets/mbpp_0_6B_20260328T133144Z.jsonl",
+      "sha256": "eec90a6ceae030b4119d760bcf28a59058b25b1b9e54a2adb841fe8afdedda19",
+      "bytes": 8232930
+    },
+    {
+      "url": "https://huggingface.co/datasets/pagarsky/agent-trace/resolve/main/datasets/mbpp_1_7B_20260403T211347Z.jsonl",
+      "sha256": "43f3b82675c0d680cc4d2d1e9689da421a70597eb45ade928eb0f77c800652fc",
+      "bytes": 21484038
+    },
+    {
+      "url": "https://huggingface.co/datasets/pagarsky/agent-trace/resolve/main/datasets/nl2bash_0_6B_20260328T133144Z.jsonl",
+      "sha256": "15ce46f5ad2a26de02f86c030bb1c9e174f65cdfedcb1490e642ac5c6ba519e6",
+      "bytes": 2194460
+    },
+    {
+      "url": "https://huggingface.co/datasets/pagarsky/agent-trace/resolve/main/datasets/nl2bash_1_7B_20260403T211347Z.jsonl",
+      "sha256": "250313ae096b0bb8c1986b6f571b68f4ff7617a12026db20214ad84188d12ae5",
+      "bytes": 4984809
+    }
+  ],
+  "output_file": "data/source/agenttrace_readable.jsonl",
+  "output_sha256": "20b2439cff3a440e29a401e8952ec5d779876feab5d9ef2801c5d8c69e324fd9",
+  "selection": "Qwen3-0.6B and Qwen3-1.7B rows with a nonempty prompt, consecutive model steps, positive output_tokens, exactly one matched nonfinal tool span per nonfinal step, and a final step with final_answer or no call. No max-context or max-output filtering yet.",
+  "n_gen": "Source llm_steps[].output_tokens; compatibility with the served model must be checked by later preprocessing.",
+  "tool_delay": "Only the source tool span duration is retained: observed_delay_s = spans[].duration_ms / 1000. The converter maps this value to runnable tool_delay_s. No synthetic delay is assigned in this source file.",
+  "split": "SHA-256(source_task_key), first 32 bits modulo 10; values 0-1 eval, 2-9 dev. Both model versions of the same original task share a split.",
+  "counts": {
+    "source_rows": 1400,
+    "retained": 1257,
+    "class_mbpp": 906,
+    "class_model_mbpp_Qwen/Qwen3-0.6B": 467,
+    "class_model_mbpp_Qwen/Qwen3-1.7B": 439,
+    "class_model_nl2bash_Qwen/Qwen3-0.6B": 185,
+    "class_model_nl2bash_Qwen/Qwen3-1.7B": 166,
+    "class_nl2bash": 351,
+    "model_Qwen/Qwen3-0.6B": 652,
+    "model_Qwen/Qwen3-1.7B": 605,
+    "split_dev": 1001,
+    "split_eval": 256,
+    "excluded_ambiguous_nonfinal_tool_call": 138,
+    "excluded_tool_span_count_mismatch": 1,
+    "excluded_zero_model_steps": 4,
+    "unique_original_tasks": 696,
+    "paired_original_tasks": 561,
+    "model_steps": 3200,
+    "tool_waits": 1943,
+    "observed_tool_waits": 1943
+  },
+  "step_count_histogram": {
+    "1": 386,
+    "2": 538,
+    "3": 149,
+    "4": 50,
+    "5": 30,
+    "6": 22,
+    "7": 13,
+    "8": 7,
+    "9": 8,
+    "10": 4,
+    "11": 50
+  }
+}

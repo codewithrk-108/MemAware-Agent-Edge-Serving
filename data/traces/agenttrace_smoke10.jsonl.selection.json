@@ -1,0 +1,21 @@
+{
+  "source": "data/traces/agenttrace_dev.jsonl",
+  "source_sha256": "e1a57e249d548863539cf70c28e1735674f59fc12c3561492a953282a4f848c0",
+  "selection": "Five MBPP single-step and five NL2Bash two-step Qwen3-0.6B development tasks with total n_gen <= 800, drawn without replacement from task_id-sorted eligible rows using NumPy default_rng(42).",
+  "task_ids": [
+    "agenttrace-mbpp-431-qwen3-0.6b",
+    "agenttrace-mbpp-307-qwen3-0.6b",
+    "agenttrace-mbpp-388-qwen3-0.6b",
+    "agenttrace-mbpp-127-qwen3-0.6b",
+    "agenttrace-mbpp-92-qwen3-0.6b",
+    "agenttrace-nl2bash-74-qwen3-0.6b",
+    "agenttrace-nl2bash-114-qwen3-0.6b",
+    "agenttrace-nl2bash-176-qwen3-0.6b",
+    "agenttrace-nl2bash-34-qwen3-0.6b",
+    "agenttrace-nl2bash-2-qwen3-0.6b"
+  ],
+  "output_sha256": "c5c41c506b6f57dc94d0115deb50dc5f25a124fad9c0ccf4c561f9f1ed5fd5ce",
+  "tasks": 10,
+  "model_requests": 15,
+  "output_tokens_budget": 6480
+}

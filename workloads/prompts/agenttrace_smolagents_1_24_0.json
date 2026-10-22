@@ -1,0 +1,12 @@
+{
+  "smolagents_version": "1.24.0",
+  "template_source": "smolagents/prompts/toolcalling_agent.yaml in smolagents 1.24.0 wheel",
+  "template_sha256": "28820f24906dd3ee3faa8160945e00529dda2a39c9fa8b3362093c0560c4b8f7",
+  "rendered_prompt_sha256": "aec6a6966695ecd966689c1ebb95628e899d44df0d03d97951ae2ee903782a2f",
+  "tool_order": [
+    "python_interpreter",
+    "bash",
+    "final_answer"
+  ],
+  "tool_descriptions": "PythonInterpreterTool and FinalAnswerTool from smolagents 1.24.0; BashTool from pagarsky/agent-trace/src/tools.py. Python authorized-import list sorted for deterministic rendering. The source trace did not capture rendered system messages, so this is a reproducible reconstruction rather than byte-for-byte proof of the original prompt."
+}

@@ -40,7 +40,7 @@ distinct run names.
 
 ## Workloads
 
-**Synthetic** (`workloads/synthetic.yaml`): four task classes with shared per-class system prompts.
+**Synthetic** (`workloads/synthetic.yaml`): four task classes with shared per-class random token prefixes.
 
 | class | share | steps | first context | tokens/step | tool result | tool delay (median) |
 |---|---|---|---|---|---|---|
@@ -54,13 +54,21 @@ distinct run names.
 model's chat template; every task of an environment shares the instruction + demonstration prefix.
 Tool latency is **not** in the dataset and is modeled per environment (stated in the yaml).
 
+**AgentTrace** (`data/source/agenttrace_readable.jsonl`): MBPP and NL2Bash task runs from Qwen3-0.6B and
+Qwen3-1.7B. Convert the readable source to runner traces with `python -m workloads.build_agenttrace` and the
+served model's `/tokenize` endpoint. The converter prepends the pinned tool-calling system instructions to
+the first request, appends fixed tool results at later steps, and excludes contexts that exceed the configured
+limit. Preconverted development and evaluation files are in `data/traces/`; they use the pinned official Qwen3
+tokenizer JSON. See [the source workload notes](data/source/README.md) for regeneration commands and provenance.
+
 Prompts are sent as token ids, responses have a fixed length (`ignore_eos`), and each step appends the model's
 own output to the history, so context growth and prefix reuse behave as in a real agent loop.
 
 ## Phase 1 baseline
 
-- Tasks arrive open-loop (Poisson) into one FIFO queue; N workers each run the oldest task to completion.
-- An admitted task keeps its slot through tool waits (the idle periods between steps).
+- Tasks arrive open-loop (Poisson); each ready model request enters one FIFO queue.
+- N workers each run one model request. A task releases its worker during a tool wait and its continuation
+  joins the FIFO tail when the fixed tool result arrives.
 - llama-server gets `-np N`, so the server never queues internally: admission is decided only by the FIFO.
 - A task not finished 240 s after arrival is abandoned and counted as a timeout (queued or running).
 - Memory budget: KV cache `-c` (default 16384 tokens = 512 MiB) + host prompt cache (`--cache-ram`, server default 8 GiB).

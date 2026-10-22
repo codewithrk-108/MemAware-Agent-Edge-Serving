@@ -1,0 +1,19 @@
+{
+  "source_file": "data/source/agenttrace_readable.jsonl",
+  "source_sha256": "20b2439cff3a440e29a401e8952ec5d779876feab5d9ef2801c5d8c69e324fd9",
+  "output_file": "data/traces/agenttrace_eval.jsonl",
+  "output_sha256": "c8c22cc2d75be288df40ce38d802c8616b1d2e06a046a363ba574fd9ea79f77e",
+  "system_prompt_file": "workloads/prompts/agenttrace_smolagents_1_24_0.txt",
+  "system_prompt_sha256": "aec6a6966695ecd966689c1ebb95628e899d44df0d03d97951ae2ee903782a2f",
+  "split": "eval",
+  "source_model": "all",
+  "max_context": 16384,
+  "counts": {
+    "source_rows": 1257,
+    "filtered_split": 1001,
+    "written": 237,
+    "excluded_context_limit": 19
+  },
+  "tokenizer_json_file": "data/source/Qwen3-0.6B-tokenizer.json",
+  "tokenizer_json_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+}
