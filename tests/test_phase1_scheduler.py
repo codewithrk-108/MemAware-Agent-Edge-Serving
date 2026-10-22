@@ -38,6 +38,9 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.srv = SimpleNamespace(url="http://test")
 
+    def test_request_fifo_is_default(self):
+        self.assertEqual(RunConfig(name="default").scheduler, "request")
+
     async def test_task_fifo_holds_worker_through_tool_wait(self):
         tasks = [
             task("a", [Step([10], 1, 0.02), Step([11], 1, None)]),

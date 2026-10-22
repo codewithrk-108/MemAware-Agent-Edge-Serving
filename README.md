@@ -64,8 +64,8 @@ Per request: TTFT, TPOT (client side), prompt tokens computed vs reused, errors.
 Per task: queueing time, completion time, service time, tool time, outcome.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
 
-The behavior above is the default `task` scheduler. The runner also provides an opt-in `request` scheduler. In
-request mode, one worker executes one model step and is released while the following tool call runs. The task is
+The runner uses the `request` scheduler by default. In request mode, one worker executes one model step and is
+released while the following tool call runs. The task is
 not in the runnable FIFO during that wait. When the tool finishes, its response is appended to the task history
 and the next model step is appended to the tail of the FIFO. Other ready requests therefore use the server during
 the tool wait, and FIFO order is based on when each model step becomes ready.
@@ -88,8 +88,8 @@ Run only the matched task-versus-request comparison sweep:
 uv run python -m phase1.sweep --groups scheduler
 ```
 
-Use `--scheduler task` explicitly to select the original whole-task FIFO behavior. If the flag is omitted, `task`
-remains the default. In request mode, `concurrency` is the maximum number of active LLM calls; tool-waiting tasks
+Use `--scheduler task` explicitly to select the original whole-task FIFO behavior. If the flag is omitted,
+`request` is used. In request mode, `concurrency` is the maximum number of active LLM calls; tool-waiting tasks
 do not consume that capacity.
 
 | group | varies | question |

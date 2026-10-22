@@ -1,9 +1,9 @@
 """Phase 1 baseline: FIFO queue with fixed concurrency in front of llama-server.
 
-Tasks arrive open-loop (Poisson) and wait in one FIFO queue. The default task scheduler has N workers run whole
-tasks, holding workers through tool waits. The optional request scheduler runs one model step per dequeue. It
-releases the worker while the tool runs, appends the tool response when it finishes, and then puts the next step
-at the tail of the FIFO as runnable work.
+Tasks arrive open-loop (Poisson) and wait in one FIFO queue. The default request scheduler runs one model step per
+dequeue, releases the worker while the tool runs, appends the tool response when it finishes, and then puts the
+next step at the tail of the FIFO as runnable work. The optional task scheduler has N workers run whole tasks,
+holding workers through tool waits.
 llama-server gets N slots, so the Python scheduler decides admission.
 
 A task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.
@@ -39,7 +39,7 @@ class RunConfig:
     cache_prompt: bool = True        # let the server reuse cached prefixes
     deadline_s: float = 240.0        # per task, from arrival
     request_timeout_s: float = 180.0
-    scheduler: str = "task"          # task: hold worker through tools; request: queue one model step at a time
+    scheduler: str = "request"       # request: one ready step at a time; task: hold worker through tools
     seed: int = 0
     server: ServerConfig = field(default_factory=ServerConfig)
 
@@ -399,7 +399,7 @@ def main():
     p.add_argument("--no-cache-prompt", action="store_true")
     p.add_argument("--delay-scale", type=float, default=1.0)
     p.add_argument("--deadline", type=float, default=240.0)
-    p.add_argument("--scheduler", choices=("task", "request"), default="task")
+    p.add_argument("--scheduler", choices=("task", "request"), default="request")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--allow-battery", action="store_true")
     a = p.parse_args()

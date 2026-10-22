@@ -4,8 +4,8 @@
 
 The `main` branch supports two schedulers:
 
-- `task` (default): one worker owns a complete multi-step task, including tool waits.
-- `request`: one worker executes one LLM step, releases capacity during the tool call, and appends the next step to the FIFO tail only after the tool response is available.
+- `request` (default): one worker executes one LLM step, releases capacity during the tool call, and appends the next step to the FIFO tail only after the tool response is available.
+- `task`: one worker owns a complete multi-step task, including tool waits.
 
 The earlier policy—placing a pending placeholder in the FIFO when the tool begins—is preserved on the `fifo-improved` branch.
 
@@ -49,7 +49,7 @@ append next step to FIFO tail
 uv run python -m phase1.runner --scheduler request ...
 ```
 
-Omitting the flag retains task-level FIFO. `RunConfig.scheduler` and result metadata use the values `task` and `request`.
+Omitting the flag selects request-level FIFO. Use `--scheduler task` for whole-task FIFO. `RunConfig.scheduler` and result metadata use the values `task` and `request`.
 
 ## Implementation surface
 
@@ -61,7 +61,7 @@ Omitting the flag retains task-level FIFO. `RunConfig.scheduler` and result meta
 
 ## Completed checklist
 
-- [x] Preserve task FIFO as the default.
+- [x] Make request FIFO the default while retaining explicit task FIFO.
 - [x] Add `--scheduler {task,request}` and metadata.
 - [x] Execute one model step per dequeue in request mode.
 - [x] Keep task histories across workers and steps.

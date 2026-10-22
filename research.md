@@ -294,7 +294,7 @@ No changes are needed in the harness client/server, trace schema, workload build
 
 ## Main-branch revision: ready-time request FIFO
 
-On `main`, a later model step does not enter FIFO when its tool call begins. The task remains in a separate
+On `main`, this is the default scheduler. A later model step does not enter FIFO when its tool call begins. The task remains in a separate
 tool-waiting state with no worker. When the tool finishes, the scheduler appends the tool-response tokens to the
 persistent task history and then appends the next model step to the FIFO tail as runnable work.
 
