@@ -19,7 +19,14 @@ OUTCOMES = ["ok", "failed", "timeout_running", "timeout_queued"]
 
 def summaries() -> pd.DataFrame:
     rows = [json.loads(m.read_text())["summary"] for m in sorted(P1.glob("*/meta.json"))]
-    return pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
+    if not rows:
+        return pd.DataFrame()
+    out = pd.DataFrame(rows)
+    if "scheduler" not in out:
+        out["scheduler"] = "task"
+    else:
+        out["scheduler"] = out.scheduler.fillna("task")
+    return out.set_index("name")
 
 
 def run_data(name: str) -> dict:
@@ -133,7 +140,8 @@ def factor(s: pd.DataFrame, names: dict, title: str, fname: str, xlabel: str):
 
 
 def timelines(s: pd.DataFrame):
-    names = [n for n in ("syn_N4", "syn_N16", "syn_N32", "ai_N16") if n in s.index]
+    names = [n for n in ("syn_N4", "syn_N16", "syn_N32", "ai_N16", "syn_N8_task", "syn_N8_request")
+             if n in s.index]
     if not names:
         return
     fig, ax = plt.subplots(len(names), 1, figsize=(10, 2.6 * len(names)), sharex=False)
@@ -145,6 +153,9 @@ def timelines(s: pd.DataFrame):
         b = a.twinx()
         b.step(d["timeline"].t, d["timeline"].queued, "C0", where="post", lw=1, label="queued tasks")
         b.step(d["timeline"].t, d["timeline"].running, "C2", where="post", lw=1, label="running tasks")
+        if "tool_waiting" in d["timeline"]:
+            b.step(d["timeline"].t, d["timeline"].tool_waiting, "C1", where="post", lw=1,
+                   label="tool-waiting tasks")
         b.set_ylabel("tasks")
         fails = d["requests"][d["requests"].error.notna()]
         for t in fails.t_rel:
@@ -186,6 +197,8 @@ def main():
     for tr, label in TRACES.items():
         factor(s, {f"{tr}_N8": "default", f"{tr}_N8_noram": "no host cache", f"{tr}_N8_noreuse": "no prefix reuse"},
                f"Retained contexts and prefix reuse at N=8 ({label})", f"retention_{tr}", "configuration")
+        factor(s, {f"{tr}_N8_task": "task FIFO", f"{tr}_N8_request": "request FIFO"},
+               f"Task-level vs request-level FIFO at N=8 ({label})", f"scheduler_{tr}", "scheduler")
     timelines(s)
     per_class(s)
     s.to_csv(P1 / "summary.csv")

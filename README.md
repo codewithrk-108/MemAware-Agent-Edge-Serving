@@ -27,7 +27,7 @@ hf download bartowski/Llama-3.2-1B-Instruct-GGUF Llama-3.2-1B-Instruct-Q8_0.gguf
 uv run python -m workloads.build_synthetic           # data/traces/synthetic.jsonl
 hf download zai-org/AgentInstruct --repo-type dataset --local-dir data/raw/AgentInstruct
 uv run python -m workloads.build_agentinstruct       # data/traces/agentinstruct.jsonl
-uv run python -m phase1.sweep                        # 20 runs, ~2 h, resumes if interrupted
+uv run python -m phase1.sweep                        # baseline plus scheduler comparisons; resumes if interrupted
 uv run python -m analysis.plot_phase1                # results/phase1/figures, summary.md
 ```
 
@@ -64,12 +64,42 @@ Per request: TTFT, TPOT (client side), prompt tokens computed vs reused, errors.
 Per task: queueing time, completion time, service time, tool time, outcome.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
 
+The behavior above is the default `task` scheduler. The runner also provides an opt-in `request` scheduler. In
+request mode, one worker executes one model step. As soon as that step starts a tool call, a placeholder for the
+next step is appended to the FIFO and the worker is released. The tool response is appended to the task history
+while that placeholder waits in the queue, and the placeholder becomes runnable only after the tool finishes.
+Workers skip tool-pending placeholders without moving them, so other runnable requests use the server while the
+pending placeholder retains its original FIFO position.
+
+Run one configuration in request mode:
+
+```bash
+uv run python -m phase1.runner \
+  --name syn_request_N8 \
+  --trace data/traces/synthetic.jsonl \
+  --n-tasks 100 \
+  --rate 0.4 \
+  --concurrency 8 \
+  --scheduler request
+```
+
+Run only the matched task-versus-request comparison sweep:
+
+```bash
+uv run python -m phase1.sweep --groups scheduler
+```
+
+Use `--scheduler task` explicitly to select the original whole-task FIFO behavior. If the flag is omitted, `task`
+remains the default. In request mode, `concurrency` is the maximum number of active LLM calls; tool-waiting tasks
+do not consume that capacity.
+
 | group | varies | question |
 |---|---|---|
 | `concurrency_syn`, `concurrency_ai` | N = 1..32 | where does completed work peak, what does more admission cost |
 | `budget_syn` | KV budget 8k / 16k / 32k at N = 16 | memory pressure vs failures |
 | `idle_syn` | tool delay x0 / x1 / x4 at N = 8 | cost of idle periods between steps |
 | `retention_syn`, `retention_ai` | host cache off, prefix reuse off | do retained contexts and reusable prefixes matter |
+| `scheduler` | task FIFO vs request FIFO at N = 8 | does releasing workers during tool waits improve utilization |
 
 ## Runtime facts the baseline depends on (from the microbenchmarks)
 
