@@ -64,7 +64,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(row["tool_waiting"] == 1 for row in timeline.rows))
         self.assertTrue(all(r.status == "ok" for r in recs))
 
-    async def test_pending_entry_keeps_position_when_activated(self):
+    async def test_tool_completion_appends_step_to_fifo_tail(self):
         tasks = [
             task("a", [Step([10], 1, 0.015), Step([11], 1, None)]),
             task("b", [Step([20], 1, None)]),
@@ -74,7 +74,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         cfg = RunConfig(name="position", concurrency=1, arrival_rate=0, scheduler="request")
         with patch("phase1.runner.complete", fake):
             await run_request_fifo(cfg, self.srv, tasks, np.array([0.0, 0.001, 0.005]))
-        self.assertEqual([p[0] for p in fake.calls], [10, 20, 10, 30])
+        self.assertEqual([p[0] for p in fake.calls], [10, 20, 30, 10])
 
     async def test_tool_wait_deadline_finishes_without_next_request(self):
         tasks = [task("a", [Step([10], 1, 0.05), Step([11], 1, None)])]

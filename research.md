@@ -211,7 +211,9 @@ If the next goal is to complete Phase 1, the minimal operational surface is:
 - Should Phase 1 remain strictly a baseline reproduction, or is a new scheduling/admission feature planned after it?
 - Should large traces, logs, figures, and result CSVs remain version-controlled, or move to an artifact/data store?
 
-## Feature research: optional request-level FIFO scheduling
+## Historical feature research: pending-placeholder FIFO (`fifo-improved` branch)
+
+The design below is preserved on the `fifo-improved` branch. It is not the request-mode policy on `main`.
 
 ### Current task-level behavior
 
@@ -289,3 +291,20 @@ No changes are needed in the harness client/server, trace schema, workload build
 - Greater interleaving may reduce prompt-cache hits and increase prefill work.
 - The same concurrency value means admitted tasks in task mode but active requests in request mode.
 - Integration tests depend on an external llama.cpp build/model, so scheduler correctness needs deterministic fake-completion tests.
+
+## Main-branch revision: ready-time request FIFO
+
+On `main`, a later model step does not enter FIFO when its tool call begins. The task remains in a separate
+tool-waiting state with no worker. When the tool finishes, the scheduler appends the tool-response tokens to the
+persistent task history and then appends the next model step to the FIFO tail as runnable work.
+
+This makes ordering conventional ready-time FIFO:
+
+```text
+step A1 completes -> A waits outside FIFO for its tool
+step B becomes ready -> B enters FIFO
+A's tool completes -> append response -> A2 enters FIFO behind B
+```
+
+The simplified policy has no pending FIFO entries, no skip count, and no head-of-line question. Timeline
+`tool_waiting` counts tasks outside FIFO, while `queued` and `runnable` count ready model steps.

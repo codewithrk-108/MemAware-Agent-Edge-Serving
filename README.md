@@ -65,11 +65,10 @@ Per task: queueing time, completion time, service time, tool time, outcome.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
 
 The behavior above is the default `task` scheduler. The runner also provides an opt-in `request` scheduler. In
-request mode, one worker executes one model step. As soon as that step starts a tool call, a placeholder for the
-next step is appended to the FIFO and the worker is released. The tool response is appended to the task history
-while that placeholder waits in the queue, and the placeholder becomes runnable only after the tool finishes.
-Workers skip tool-pending placeholders without moving them, so other runnable requests use the server while the
-pending placeholder retains its original FIFO position.
+request mode, one worker executes one model step and is released while the following tool call runs. The task is
+not in the runnable FIFO during that wait. When the tool finishes, its response is appended to the task history
+and the next model step is appended to the tail of the FIFO. Other ready requests therefore use the server during
+the tool wait, and FIFO order is based on when each model step becomes ready.
 
 Run one configuration in request mode:
 

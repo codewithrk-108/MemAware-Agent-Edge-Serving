@@ -2,8 +2,8 @@
 
 Tasks arrive open-loop (Poisson) and wait in one FIFO queue. The default task scheduler has N workers run whole
 tasks, holding workers through tool waits. The optional request scheduler runs one model step per dequeue. It
-queues the next-step placeholder when its tool starts, appends the tool response while queued, and activates that
-entry in place when the tool finishes. Tool-pending entries retain FIFO position but do not block runnable work.
+releases the worker while the tool runs, appends the tool response when it finishes, and then puts the next step
+at the tail of the FIFO as runnable work.
 llama-server gets N slots, so the Python scheduler decides admission.
 
 A task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.
@@ -89,7 +89,7 @@ class RequestTaskState:
 
 
 class RunnableFifo:
-    """Ordered entries where pending tools retain position but do not block runnable work."""
+    """FIFO of model steps whose inputs, including any tool response, are ready."""
 
     def __init__(self):
         self.entries = []
@@ -101,22 +101,6 @@ class RunnableFifo:
             state.runnable = runnable
             self.entries.append(state)
             self.changed.notify_all()
-
-    async def activate(self, state: RequestTaskState) -> bool:
-        async with self.changed:
-            if state.terminal or state not in self.entries:
-                return False
-            state.runnable = True
-            self.changed.notify_all()
-            return True
-
-    async def remove(self, state: RequestTaskState) -> bool:
-        async with self.changed:
-            if state not in self.entries:
-                return False
-            self.entries.remove(state)
-            self.changed.notify_all()
-            return True
 
     async def take(self) -> Optional[RequestTaskState]:
         async with self.changed:
@@ -231,8 +215,7 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
         if left <= 0 or delay >= left:
             if left > 0:
                 await asyncio.sleep(left)
-            if await scheduler.remove(state):
-                tl.mark(loop.time(), dq=-1, dtool=-1)
+            tl.mark(loop.time(), dtool=-1)
             finish(state, "timeout_queued", "deadline while waiting for tool")
             return
         await asyncio.sleep(delay)
@@ -240,9 +223,9 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
             return
         step = tasks[state.task_index].steps[state.next_step]
         state.history = state.history + step.input
-        state.runnable_at = loop.time()
-        if await scheduler.activate(state):
-            tl.mark(loop.time(), dready=+1, dtool=-1)
+        state.enqueued_at = state.runnable_at = loop.time()
+        await scheduler.put(state, runnable=True)
+        tl.mark(loop.time(), dq=+1, dready=+1, dtool=-1)
 
     async with new_session(limit=cfg.concurrency + 8) as session:
         async def arrivals():
@@ -304,9 +287,8 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
 
                 delay = (step.tool_delay_s or 0.0) * cfg.delay_scale
                 rec.tool_s += delay
-                state.enqueued_at, state.runnable_at = loop.time(), None
-                await scheduler.put(state, runnable=False)
-                tl.mark(loop.time(), dq=+1, dr=-1, dtool=+1)
+                state.enqueued_at, state.runnable_at = 0.0, None
+                tl.mark(loop.time(), dr=-1, dtool=+1)
                 job = asyncio.create_task(wait_for_tool(state, delay))
                 tool_jobs.append(job)
 
