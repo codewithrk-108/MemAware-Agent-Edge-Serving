@@ -20,17 +20,17 @@ from workloads.trace import Step, Task, describe, lognormal, save
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 
-# Llama 3 chat template
+# Qwen3 ChatML template
 ROLE = {"human": "user", "gpt": "assistant"}
-BOS = "<|begin_of_text|>"
+BOS = ""
 
 
 def turn_text(role: str, text: str) -> str:
-    return f"<|start_header_id|>{role}<|end_header_id|>\n\n{text}<|eot_id|>"
+    return f"<|im_start|>{role}\n{text}<|im_end|>\n"
 
 
-ASSISTANT_HEADER = "<|start_header_id|>assistant<|end_header_id|>\n\n"
-EOT = "<|eot_id|>"
+ASSISTANT_HEADER = "<|im_start|>assistant\n"
+EOT = "<|im_end|>\n"
 
 
 async def tokenize_all(url: str, texts: list, concurrency: int = 32) -> list:

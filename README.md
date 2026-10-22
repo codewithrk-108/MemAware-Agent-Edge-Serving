@@ -1,6 +1,6 @@
 # Memory-aware agent edge serving: Phase 1 baseline
 
-Runtime: llama.cpp `llama-server` (Metal), model fixed to Llama-3.2-1B-Instruct Q8_0 for all main comparisons.
+Runtime: llama.cpp `llama-server` (Metal), model fixed to Qwen3-0.6B Q8_0 for all main comparisons.
 Machine: Apple M5, 24 GB unified memory. **Run on AC power** - on battery macOS throttles the GPU and timings get
 2-3x slower and noisy; the scripts refuse to run on battery unless `--allow-battery` is passed.
 
@@ -20,7 +20,7 @@ Machine: Apple M5, 24 GB unified memory. **Run on AC power** - on battery macOS 
 ```bash
 uv sync
 # llama.cpp next to this folder, built with: cmake -B build && cmake --build build -j --target llama-server
-hf download bartowski/Llama-3.2-1B-Instruct-GGUF Llama-3.2-1B-Instruct-Q8_0.gguf --local-dir ../models
+hf download Qwen/Qwen3-0.6B-GGUF Qwen3-0.6B-Q8_0.gguf --local-dir ../models
 
 ./micro/run_all.sh                                   # microbenchmarks, ~40 min
 
@@ -32,6 +32,11 @@ uv run python -m analysis.plot_phase1                # results/phase1/figures, s
 ```
 
 Paths can be overridden with `LLAMA_SERVER=` and `MODEL=`.
+
+The checked-in AgentInstruct trace may have been generated with a different tokenizer. Re-run
+`workloads.build_agentinstruct` after downloading Qwen3 before collecting Qwen results; token IDs are
+model-specific. Existing result directories are also model-specific and should be regenerated or kept under
+distinct run names.
 
 ## Workloads
 
