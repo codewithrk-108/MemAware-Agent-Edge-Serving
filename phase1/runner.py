@@ -26,6 +26,13 @@ from harness.server import Server, ServerConfig
 from workloads.trace import load
 
 ROOT = Path(__file__).resolve().parents[1]
+ADMISSION_CHECK_COLUMNS = (
+    "t", "worker", "task_index", "task_id", "step", "queue_length_before",
+    "active_count", "active_reserved_tokens", "kv_capacity_tokens", "kv_budget_remaining_tokens",
+    "head_prompt_tokens", "head_output_budget_tokens", "head_need_tokens", "head_fits",
+    "fitting_later_count", "smallest_fitting_later_need_tokens", "backfill_opportunity",
+    "request_outcome",
+)
 
 
 @dataclass
@@ -66,6 +73,7 @@ class Timeline:
 
     def __init__(self, t0: float):
         self.t0, self.rows = t0, []
+        self.admission_checks = []
         self.queued, self.runnable, self.running, self.tool_waiting = 0, 0, 0, 0
 
     def mark(self, now: float, dq: int = 0, dr: int = 0, dready: int = 0, dtool: int = 0):
@@ -192,6 +200,7 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
     all_done = asyncio.Event()
     completed = 0
     tool_jobs = []
+    active_needs = {}
 
     if not states:
         all_done.set()
@@ -256,7 +265,40 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
                 task = tasks[state.task_index]
                 step_index = state.next_step
                 step = task.steps[step_index]
+                head_prompt_tokens = len(state.history)
+                head_need_tokens = head_prompt_tokens + step.n_gen
+                active_reserved_tokens = sum(active_needs.values())
+                kv_budget_remaining_tokens = cfg.server.ctx - active_reserved_tokens
+                head_fits = head_need_tokens <= kv_budget_remaining_tokens
+                later_needs = []
+                for candidate in scheduler.entries:
+                    candidate_rec = recs[candidate.task_index]
+                    if now - candidate_rec.arrival >= cfg.deadline_s:
+                        continue
+                    candidate_step = tasks[candidate.task_index].steps[candidate.next_step]
+                    need = len(candidate.history) + candidate_step.n_gen
+                    if need <= kv_budget_remaining_tokens:
+                        later_needs.append(need)
+                admission_check = {
+                    "t": now - t0, "worker": w, "task_index": state.task_index,
+                    "task_id": task.task_id, "step": step_index,
+                    "queue_length_before": 1 + len(scheduler.entries),
+                    "active_count": len(active_needs),
+                    "active_reserved_tokens": active_reserved_tokens,
+                    "kv_capacity_tokens": cfg.server.ctx,
+                    "kv_budget_remaining_tokens": kv_budget_remaining_tokens,
+                    "head_prompt_tokens": head_prompt_tokens,
+                    "head_output_budget_tokens": step.n_gen,
+                    "head_need_tokens": head_need_tokens,
+                    "head_fits": head_fits,
+                    "fitting_later_count": len(later_needs),
+                    "smallest_fitting_later_need_tokens": min(later_needs) if later_needs else None,
+                    "backfill_opportunity": not head_fits and bool(later_needs),
+                    "request_outcome": None,
+                }
+                tl.admission_checks.append(admission_check)
                 tl.mark(loop.time(), dr=+1)
+                active_needs[w] = head_need_tokens
                 try:
                     r = await asyncio.wait_for(
                         complete(session, srv.url, state.history, step.n_gen, cache_prompt=cfg.cache_prompt,
@@ -264,11 +306,16 @@ async def run_request_fifo(cfg: RunConfig, srv: Server, tasks: list, offsets) ->
                         timeout=left,
                     )
                 except asyncio.TimeoutError:
+                    admission_check["request_outcome"] = "timeout_running"
                     tl.mark(loop.time(), dr=-1)
                     finish(state, "timeout_running", "deadline during request")
                     continue
+                finally:
+                    active_needs.pop(w, None)
 
-                r.update(task_id=task.task_id, cls=task.cls, step=step_index, worker=w,
+                admission_check["request_outcome"] = "error" if r["error"] else "ok"
+                r.update(task_id=task.task_id, task_index=state.task_index, cls=task.cls,
+                         step=step_index, worker=w,
                          t_rel=r["t_send"] - t0, ready_queue_s=wait_s)
                 requests.append(r)
                 if r["error"]:
@@ -318,7 +365,8 @@ async def run(cfg: RunConfig, srv: Server) -> tuple:
     return await run_task_fifo(cfg, srv, tasks, offsets)
 
 
-def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.DataFrame, metrics: dict) -> dict:
+def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.DataFrame,
+              metrics: dict, admission_checks: list) -> dict:
     ok = tasks[tasks.status == "ok"]
     rok = reqs[reqs.error.isna()] if len(reqs) else reqs
     span = (tasks.finish.max() - tasks.arrival.min()) if len(tasks) else float("nan")
@@ -343,6 +391,11 @@ def summarize(cfg: RunConfig, tasks: pd.DataFrame, reqs: pd.DataFrame, mem: pd.D
         "cache_hit_ratio": float(rok.cache_n.sum() / rok.n_prompt.sum()) if len(rok) else float("nan"),
         "prefill_tokens_computed": int(rok.prompt_n.sum()) if len(rok) else 0,
         "requests": len(reqs), "requests_failed": int(reqs.error.notna().sum()) if len(reqs) else 0,
+        "kv_context_errors": int(reqs.error.fillna("").str.contains(
+            "Context size has been exceeded", case=False, regex=False).sum()) if len(reqs) else 0,
+        "admission_decisions": len(admission_checks),
+        "head_would_exceed_budget": sum(not row["head_fits"] for row in admission_checks),
+        "backfill_opportunities": sum(row["backfill_opportunity"] for row in admission_checks),
         "peak_footprint_mib": float(mem.footprint_mib.max()) if len(mem) else float("nan"),
         "start_footprint_mib": float(mem.footprint_mib.iloc[0]) if len(mem) else float("nan"),
         "span_s": float(span),
@@ -369,11 +422,14 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
     for c in ("arrival", "admit", "finish"):
         tasks[c] = tasks[c] - t0
     reqs = pd.DataFrame(requests).drop(columns=["tokens"], errors="ignore")
-    summary = summarize(cfg, tasks, reqs, mem, metrics)
+    summary = summarize(cfg, tasks, reqs, mem, metrics, tl.admission_checks)
 
     tasks.to_csv(out / "tasks.csv", index=False)
     reqs.to_csv(out / "requests.csv", index=False)
     pd.DataFrame(tl.rows).to_csv(out / "timeline.csv", index=False)
+    if cfg.scheduler == "request":
+        pd.DataFrame(tl.admission_checks).reindex(columns=ADMISSION_CHECK_COLUMNS).to_csv(
+            out / "admission_checks.csv", index=False)
     mem.to_csv(out / "memory.csv", index=False)
     (out / "meta.json").write_text(json.dumps({"env": environment(), "run": asdict(cfg), "summary": summary,
                                                "server_args": " ".join(cfg.server.args()), "doc": __doc__},

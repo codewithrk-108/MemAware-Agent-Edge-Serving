@@ -152,7 +152,6 @@ Each task has a deadline measured from arrival. A task can end as `ok`, `failed`
 - `results/micro/summary.md`: generated headline table. It reports 32 KiB of KV per token, 13x reuse speedup at 4,096 tokens, and the host-cache memory/latency tradeoff, among other partial results.
 - `results/micro/m1_memory.stdout`: records a refused battery-powered invocation, not benchmark data.
 - `results/_logs/tokenizer.log`: successful temporary tokenizer-server startup/shutdown; it also exposes the original author's absolute model path.
-- `results/_smoke/server.log` and `results/_smoke/nommap.log`: large smoke-test server logs used during development; they are diagnostic artifacts, not structured result inputs.
 
 ### Nested Git metadata
 

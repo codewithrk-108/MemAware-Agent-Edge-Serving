@@ -76,6 +76,15 @@ own output to the history, so context growth and prefix reuse behave as in a rea
 Per request: TTFT, TPOT (client side), prompt tokens computed vs reused, errors.
 Per task: queueing time, completion time, service time, tool time, outcome.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
+Request-FIFO runs also write `admission_checks.csv`. Before each dispatch, this read-only diagnostic estimates
+the remaining KV budget as `-c` minus the full prompt plus output budgets of active requests. It records whether
+the oldest ready request would exceed that budget and how many later ready requests would fit individually. The `meta.json`
+summary counts those events and size-only backfill opportunities. This is not a live GPU KV measurement: it
+reserves future output tokens for active requests but does not account for retained idle cache or runtime overhead.
+The summary separately counts server errors containing `Context size has been exceeded` as `kv_context_errors`.
+Compare its estimates with request errors and server metrics. Each diagnostic row records whether the dispatched
+request succeeded, returned an error, or timed out. For requests that returned, `task_index` and `step` link the
+diagnostic to `requests.csv`, even when a task was sampled more than once; a deadline timeout has no request row.
 
 The runner uses the `request` scheduler by default. In request mode, one worker executes one model step and is
 released while the following tool call runs outside the FIFO. Other ready requests continue decoding. When the

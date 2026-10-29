@@ -1,0 +1,20 @@
+{
+  "source_trace": "data/traces/agenttrace_all.jsonl",
+  "source_trace_sha256": "b6d31339e3ed1e5666a6fe7d1bc046144012027b3e60752a7bf373752143add8",
+  "output_trace": "data/traces/agenttrace_all_tool_delay_150x_max10s.jsonl",
+  "output_trace_sha256": "81346e727fb278983e39d4e7d4b96f08082f8ef29856523fa96c98e1a7c2ad04",
+  "tool_delay_transform": {
+    "field": "tool_delay_s",
+    "scale": 150,
+    "cap_s": 10.0,
+    "formula": "min(source_tool_delay_s * scale, cap_s)",
+    "nulls_unchanged": true,
+    "interpretation": "controlled experimental delays; not measured execution times at this scale"
+  },
+  "counts": {
+    "tasks": 1169,
+    "model_requests": 2506,
+    "tool_calls": 1337,
+    "tool_calls_capped": 15
+  }
+}

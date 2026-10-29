@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+import pandas as pd
 
-from phase1.runner import RunConfig, run, run_request_fifo, run_task_fifo
+from phase1.runner import RunConfig, run, run_request_fifo, run_task_fifo, summarize
 from workloads.trace import Step, Task
 
 
@@ -113,9 +114,10 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         fake = FakeComplete()
         cfg = RunConfig(name="duplicates", concurrency=2, arrival_rate=0, scheduler="request")
         with patch("phase1.runner.complete", fake):
-            recs, _, _, _ = await run_request_fifo(cfg, self.srv, tasks, np.array([0.0, 0.0]))
+            recs, requests, _, _ = await run_request_fifo(cfg, self.srv, tasks, np.array([0.0, 0.0]))
         self.assertEqual([r.status for r in recs], ["ok", "ok"])
         self.assertEqual([r.steps_done for r in recs], [1, 1])
+        self.assertEqual({r["task_index"] for r in requests}, {0, 1})
 
     async def test_request_concurrency_is_bounded(self):
         tasks = [task(str(i), [Step([10 + i], 1, None)]) for i in range(6)]
@@ -124,6 +126,54 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         with patch("phase1.runner.complete", fake):
             await run_request_fifo(cfg, self.srv, tasks, np.zeros(6))
         self.assertEqual(fake.max_active, 2)
+
+    async def test_fifo_records_blocked_head_with_fitting_later_request(self):
+        tasks = [
+            task("active", [Step([10] * 6, 1, None)]),
+            task("other-active", [Step([20], 1, None)]),
+            task("head", [Step([30] * 3, 1, None)]),
+            task("smaller", [Step([40], 1, None)]),
+        ]
+        fake = FakeComplete(slow_tokens={10: 0.05, 20: 0.02})
+        cfg = RunConfig(name="kv-diagnostic", concurrency=2, arrival_rate=0, scheduler="request")
+        cfg.server.ctx = 10
+        with patch("phase1.runner.complete", fake):
+            recs, _, timeline, _ = await run_request_fifo(
+                cfg, self.srv, tasks, np.array([0.0, 0.001, 0.002, 0.003]))
+
+        checks = timeline.admission_checks
+        head = next(row for row in checks if row["task_id"] == "head")
+        self.assertEqual(head["active_reserved_tokens"], 7)
+        self.assertEqual(head["kv_budget_remaining_tokens"], 3)
+        self.assertEqual(head["head_prompt_tokens"], 3)
+        self.assertEqual(head["head_output_budget_tokens"], 1)
+        self.assertEqual(head["head_need_tokens"], 4)
+        self.assertFalse(head["head_fits"])
+        self.assertEqual(head["fitting_later_count"], 1)
+        self.assertEqual(head["smallest_fitting_later_need_tokens"], 2)
+        self.assertTrue(head["backfill_opportunity"])
+        self.assertEqual(head["request_outcome"], "ok")
+        self.assertEqual([p[0] for p in fake.calls], [10, 20, 30, 40])
+        self.assertTrue(all(r.status == "ok" for r in recs))
+
+    async def test_fifo_counts_fitting_later_requests_when_head_fits(self):
+        tasks = [
+            task("running", [Step([10] * 6, 1, None)]),
+            task("head", [Step([20] * 3, 1, None)]),
+            task("smaller", [Step([30], 1, None)]),
+        ]
+        fake = FakeComplete(slow_tokens={10: 0.02})
+        cfg = RunConfig(name="fit-count", concurrency=1, arrival_rate=0, scheduler="request")
+        cfg.server.ctx = 10
+        with patch("phase1.runner.complete", fake):
+            _, _, timeline, _ = await run_request_fifo(
+                cfg, self.srv, tasks, np.array([0.0, 0.001, 0.002]))
+
+        head = next(row for row in timeline.admission_checks if row["task_id"] == "head")
+        self.assertTrue(head["head_fits"])
+        self.assertEqual(head["fitting_later_count"], 1)
+        self.assertEqual(head["smallest_fitting_later_need_tokens"], 2)
+        self.assertFalse(head["backfill_opportunity"])
 
     async def test_zero_delay_queues_then_activates_next_step(self):
         tasks = [
@@ -148,6 +198,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recs[0].status, "failed")
         self.assertEqual(recs[0].error, "fake failure")
         self.assertEqual(timeline.queued, 0)
+        self.assertEqual(timeline.admission_checks[0]["request_outcome"], "error")
 
     async def test_deadline_during_request_is_running_timeout(self):
         tasks = [task("a", [Step([10], 1, None)])]
@@ -155,9 +206,10 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         cfg = RunConfig(name="running-deadline", concurrency=1, arrival_rate=0,
                         scheduler="request", deadline_s=0.01)
         with patch("phase1.runner.complete", fake):
-            recs, _, _, _ = await run_request_fifo(cfg, self.srv, tasks, np.zeros(1))
+            recs, _, timeline, _ = await run_request_fifo(cfg, self.srv, tasks, np.zeros(1))
         self.assertEqual(recs[0].status, "timeout_running")
         self.assertEqual(recs[0].error, "deadline during request")
+        self.assertEqual(timeline.admission_checks[0]["request_outcome"], "timeout_running")
 
     async def test_invalid_scheduler_rejected_before_loading_trace(self):
         cfg = RunConfig(name="invalid", scheduler="invalid")
@@ -165,6 +217,28 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "unknown scheduler"):
                 await run(cfg, self.srv)
         trace_load.assert_not_called()
+
+    def test_summary_counts_blocked_heads_and_backfill_opportunities(self):
+        cfg = RunConfig(name="summary", scheduler="request")
+        tasks = pd.DataFrame([{"status": "ok", "arrival": 0.0, "finish": 2.0,
+                               "completion_s": 2.0, "queue_s": 0.1, "ready_queue_s": 0.1}])
+        reqs = pd.DataFrame([{"error": None, "ttft_s": 0.01, "tpot_ms": 1.0,
+                              "predicted_n": 5, "cache_n": 0, "n_prompt": 10, "prompt_n": 10},
+                             {"error": "Context size has been exceeded.", "ttft_s": None,
+                              "tpot_ms": None, "predicted_n": None, "cache_n": None,
+                              "n_prompt": 20, "prompt_n": None}])
+        mem = pd.DataFrame([{"footprint_mib": 100.0}])
+        checks = [
+            {"head_fits": True, "fitting_later_count": 0, "backfill_opportunity": False},
+            {"head_fits": False, "fitting_later_count": 1, "backfill_opportunity": True},
+            {"head_fits": False, "fitting_later_count": 0, "backfill_opportunity": False},
+        ]
+
+        result = summarize(cfg, tasks, reqs, mem, {}, checks)
+        self.assertEqual(result["admission_decisions"], 3)
+        self.assertEqual(result["head_would_exceed_budget"], 2)
+        self.assertEqual(result["backfill_opportunities"], 1)
+        self.assertEqual(result["kv_context_errors"], 1)
 
 
 if __name__ == "__main__":
