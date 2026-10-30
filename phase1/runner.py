@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from harness.client import complete, new_session
-from harness.memory import MiB
+from harness.memory import GpuMemSampler, MiB
 from harness.results import RESULTS, check_power, environment
 from harness.server import Server, ServerConfig
 from workloads.trace import load
@@ -409,7 +409,7 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
     out = RESULTS / group / cfg.name
     out.mkdir(parents=True, exist_ok=True)
     cfg.server.parallel = cfg.concurrency
-    with Server(cfg.server, out / "server.log", sample_interval=0.1) as srv:
+    with GpuMemSampler() as gpu, Server(cfg.server, out / "server.log", sample_interval=0.1) as srv:
         recs, requests, tl, t0 = asyncio.run(run(cfg, srv))
         metrics = srv.metrics()
         mem = pd.DataFrame([{"t": s.t - t0, "footprint_mib": s.footprint / MiB, "rss_mib": s.rss / MiB}
@@ -423,6 +423,15 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
         tasks[c] = tasks[c] - t0
     reqs = pd.DataFrame(requests).drop(columns=["tokens"], errors="ignore")
     summary = summarize(cfg, tasks, reqs, mem, metrics, tl.admission_checks)
+    gpu_rows = [{**s, "t": s["t"] - t0} for s in gpu.samples]
+    summary.update({
+        "gpu_peak_used_mib": max((s["used_mib"] for s in gpu_rows), default=None),
+        "gpu_total_mib": gpu_rows[0]["total_mib"] if gpu_rows else None,
+        "gpu_uuid": gpu_rows[0]["gpu_uuid"] if gpu_rows else None,
+        "gpu_sample_count": len(gpu_rows),
+        "gpu_sampling_interval_s": gpu.interval,
+        "gpu_sampling_error": gpu.error or None,
+    })
 
     tasks.to_csv(out / "tasks.csv", index=False)
     reqs.to_csv(out / "requests.csv", index=False)
@@ -431,6 +440,8 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
         pd.DataFrame(tl.admission_checks).reindex(columns=ADMISSION_CHECK_COLUMNS).to_csv(
             out / "admission_checks.csv", index=False)
     mem.to_csv(out / "memory.csv", index=False)
+    pd.DataFrame(gpu_rows, columns=["t", "gpu_uuid", "used_mib", "total_mib"]).to_csv(
+        out / "gpu_memory.csv", index=False)
     (out / "meta.json").write_text(json.dumps({"env": environment(), "run": asdict(cfg), "summary": summary,
                                                "server_args": " ".join(cfg.server.args()), "doc": __doc__},
                                               indent=2, default=str))

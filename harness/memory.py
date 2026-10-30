@@ -6,6 +6,8 @@ The kernel also tracks the lifetime peak of the footprint, so peaks between our 
 """
 
 import ctypes
+import csv
+import subprocess
 import sys
 import threading
 import time
@@ -90,6 +92,47 @@ class MemSampler:
     def peak(self, t0: float = float("-inf"), t1: float = float("inf")) -> int:
         w = self.window(t0, t1)
         return max((s.footprint for s in w), default=0)
+
+
+def gpu_memory_sample() -> dict:
+    """Sample device-wide NVIDIA GPU 0 memory, in MiB (not per-process memory)."""
+    result = subprocess.run(
+        ["nvidia-smi", "--id=0", "--query-gpu=uuid,memory.used,memory.total",
+         "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, check=True, timeout=5,
+    )
+    uuid, used, total = next(csv.reader(result.stdout.splitlines()))
+    return {"t": time.monotonic(), "gpu_uuid": uuid.strip(), "used_mib": int(used.strip()),
+            "total_mib": int(total.strip())}
+
+
+@dataclass
+class GpuMemSampler:
+    """Sample GPU 0 once per interval, including server startup."""
+    interval: float = 1.0
+    samples: list = field(default_factory=list)
+    error: str = ""
+
+    def __post_init__(self):
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        while not self._stop.is_set():
+            try:
+                self.samples.append(gpu_memory_sample())
+            except (OSError, subprocess.SubprocessError, ValueError, StopIteration) as exc:
+                self.error = f"{type(exc).__name__}: {exc}"
+                return
+            self._stop.wait(self.interval)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._thread.join()
 
 
 if __name__ == "__main__":
