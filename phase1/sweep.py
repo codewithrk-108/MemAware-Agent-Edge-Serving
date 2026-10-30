@@ -8,6 +8,7 @@
     idle_syn       tool delays x0 / x4 at N = 8             -> cost of idle periods between agent steps
     retention_*    host prompt cache off, prefix reuse off  -> do retained contexts / reusable prefixes matter
     scheduler       task FIFO vs request FIFO at N = 8       -> does releasing workers during tools help
+    agenttrace_*    reliable and stress grids on AgentTrace  -> same questions on recorded agent trajectories
 
 Runs already in results/phase1 are skipped, so an interrupted sweep resumes.
 """
@@ -24,6 +25,8 @@ from phase1.runner import RunConfig, execute
 
 SYN = dict(trace="data/traces/synthetic.jsonl", n_tasks=100, arrival_rate=0.4)
 AI = dict(trace="data/traces/agentinstruct.jsonl", n_tasks=150, arrival_rate=0.8)
+AGENTTRACE = dict(trace="data/traces/agenttrace_dev.jsonl", n_tasks=32, arrival_rate=0.0)
+AGENTTRACE_OPEN = dict(trace="data/traces/agenttrace_dev.jsonl", n_tasks=64, arrival_rate=0.4)
 CONCURRENCY = [1, 2, 4, 8, 16, 32]
 
 
@@ -46,6 +49,46 @@ def grid() -> dict:
                       base("syn_N8_request", SYN, concurrency=8, scheduler="request"),
                       base("ai_N8_task", AI, concurrency=8, scheduler="task"),
                       base("ai_N8_request", AI, concurrency=8, scheduler="request")],
+        # AgentTrace reliability points: generous KV capacity and modest load target
+        # >=90% task success before the separate capacity stress grid.
+        "baseline_agenttrace": [
+            base("agenttrace_baseline", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1),
+        ],
+        "concurrency_agenttrace": [
+            base(f"agenttrace_N{n}", AGENTTRACE, concurrency=n, ctx=32768)
+            for n in (1, 2, 4, 8)
+        ],
+        "idle_agenttrace": [
+            base(f"agenttrace_N4_delay{d:g}", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1, delay_scale=d)
+            for d in (0.0, 1.0, 4.0)
+        ],
+        "retention_agenttrace": [
+            base("agenttrace_N4_default", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1),
+            base("agenttrace_N4_noram", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1, cache_ram=0),
+            base("agenttrace_N4_noreuse", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1, cache_ram=0, cache_prompt=False),
+        ],
+        "scheduler_agenttrace": [
+            base(f"agenttrace_N4_{scheduler}", AGENTTRACE, concurrency=4, ctx=32768,
+                 arrival_rate=0.1, scheduler=scheduler)
+            for scheduler in ("task", "request")
+        ],
+        "arrival_agenttrace": [
+            base(f"agenttrace_N8_rate{rate:g}", AGENTTRACE_OPEN, concurrency=8,
+                 ctx=32768, arrival_rate=rate)
+            for rate in (0.1, 0.4, 0.8)
+        ],
+        # Deliberately approach/exceed the KV budget to characterize the failure boundary.
+        "budget_agenttrace": [
+            base(f"agenttrace_N{n}_ctx{ctx}", AGENTTRACE, concurrency=n, ctx=ctx,
+                 cache_ram=0)
+            for ctx in (8192, 16384, 32768)
+            for n in (4, 8, 16)
+        ],
     }
     return g
 
