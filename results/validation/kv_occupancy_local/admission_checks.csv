@@ -1,0 +1,3 @@
+t,worker,task_index,task_id,step,queue_length_before,active_count,active_reserved_tokens,kv_capacity_tokens,kv_budget_remaining_tokens,head_prompt_tokens,head_output_budget_tokens,head_need_tokens,head_fits,fitting_later_count,smallest_fitting_later_need_tokens,backfill_opportunity,request_outcome
+0.00020683399998233654,0,0,kv-validation,0,1,0,0,512,512,64,64,128,True,0,,False,ok
+0.3431025840000075,0,0,kv-validation,1,1,0,0,512,512,136,64,200,True,0,,False,ok

@@ -21,6 +21,7 @@ import pandas as pd
 
 from harness.client import complete, new_session
 from harness.memory import GpuMemSampler, MiB
+from harness.kv_memory import KvMemSampler
 from harness.results import RESULTS, check_power, environment
 from harness.server import Server, ServerConfig
 from workloads.trace import load
@@ -47,6 +48,7 @@ class RunConfig:
     deadline_s: float = 240.0        # per task, from arrival
     request_timeout_s: float = 180.0
     scheduler: str = "request"       # request: one ready step at a time; task: hold worker through tools
+    require_kv_metrics: bool = False # fail before replay if physical occupancy is unavailable
     seed: int = 0
     server: ServerConfig = field(default_factory=ServerConfig)
 
@@ -410,7 +412,10 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
     out.mkdir(parents=True, exist_ok=True)
     cfg.server.parallel = cfg.concurrency
     with GpuMemSampler() as gpu, Server(cfg.server, out / "server.log", sample_interval=0.1) as srv:
-        recs, requests, tl, t0 = asyncio.run(run(cfg, srv))
+        with KvMemSampler(srv.url) as kv:
+            if cfg.require_kv_metrics and not kv.samples:
+                raise RuntimeError(kv.error or "physical KV occupancy metrics unavailable")
+            recs, requests, tl, t0 = asyncio.run(run(cfg, srv))
         metrics = srv.metrics()
         mem = pd.DataFrame([{"t": s.t - t0, "footprint_mib": s.footprint / MiB, "rss_mib": s.rss / MiB}
                             for s in srv.mem.samples])
@@ -423,6 +428,8 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
         tasks[c] = tasks[c] - t0
     reqs = pd.DataFrame(requests).drop(columns=["tokens"], errors="ignore")
     summary = summarize(cfg, tasks, reqs, mem, metrics, tl.admission_checks)
+    kv_rows = [{**s, "t": s["t"] - t0} for s in kv.samples]
+    summary.update(kv.summary())
     gpu_rows = [{**s, "t": s["t"] - t0} for s in gpu.samples]
     summary.update({
         "gpu_peak_used_mib": max((s["used_mib"] for s in gpu_rows), default=None),
@@ -442,6 +449,8 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
     mem.to_csv(out / "memory.csv", index=False)
     pd.DataFrame(gpu_rows, columns=["t", "gpu_uuid", "used_mib", "total_mib"]).to_csv(
         out / "gpu_memory.csv", index=False)
+    pd.DataFrame(kv_rows, columns=["t", "used_cells", "capacity_cells", "usage_ratio",
+                                  "requests_processing"]).to_csv(out / "kv_memory.csv", index=False)
     (out / "meta.json").write_text(json.dumps({"env": environment(), "run": asdict(cfg), "summary": summary,
                                                "server_args": " ".join(cfg.server.args()), "doc": __doc__},
                                               indent=2, default=str))
@@ -466,13 +475,15 @@ def main():
     p.add_argument("--delay-scale", type=float, default=1.0)
     p.add_argument("--deadline", type=float, default=240.0)
     p.add_argument("--scheduler", choices=("task", "request"), default="request")
+    p.add_argument("--require-kv-metrics", action="store_true",
+                   help="require instrumented runtime physical KV-cell metrics before replay")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--allow-battery", action="store_true")
     a = p.parse_args()
     check_power(a.allow_battery)
     cfg = RunConfig(name=a.name, trace=a.trace, n_tasks=a.n_tasks, arrival_rate=a.rate, concurrency=a.concurrency,
                     delay_scale=a.delay_scale, cache_prompt=not a.no_cache_prompt, deadline_s=a.deadline,
-                    scheduler=a.scheduler, seed=a.seed,
+                    scheduler=a.scheduler, require_kv_metrics=a.require_kv_metrics, seed=a.seed,
                     server=ServerConfig(ctx=a.ctx, cache_ram=a.cache_ram, mmap=False))
     execute(cfg)
 

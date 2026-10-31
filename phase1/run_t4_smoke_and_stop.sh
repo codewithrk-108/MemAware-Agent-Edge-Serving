@@ -24,7 +24,7 @@ finish() {
 }
 trap finish EXIT
 
-export MODEL=/home/ec2-user/Qwen3-0.6B-Q8_0.gguf
-export LLAMA_SERVER=/home/ec2-user/bin/llama-server
+export MODEL="${MODEL:-/home/ec2-user/Qwen3-0.6B-Q8_0.gguf}"
+export LLAMA_SERVER="${LLAMA_SERVER:-/home/ec2-user/bin/llama-server}"
 echo "Starting T4 smoke sweep at $(date -u +%FT%TZ)."
-.venv/bin/python -u -m phase1.sweep --groups smoke_t4
+.venv/bin/python -u -m phase1.sweep --groups smoke_t4 "$@"

@@ -76,6 +76,11 @@ own output to the history, so context growth and prefix reuse behave as in a rea
 
 Per request: TTFT, TPOT (client side), prompt tokens computed vs reused, errors.
 Per task: queueing time, completion time, service time, tool time, outcome.
+
+Physical KV occupancy can be sampled with the pinned runtime instrumentation in
+[runtime/README.md](runtime/README.md). The runner writes `kv_memory.csv` separately
+from `gpu_memory.csv`; missing occupancy telemetry is reported as unavailable.
+Use `--require-kv-metrics` on new runs to require this measurement before replay.
 Per run: throughput (tasks/min, tokens/s), p50/p95/p99, peak footprint, timeline of queue, running tasks and memory.
 Request-FIFO runs also write `admission_checks.csv`. Before each dispatch, this read-only diagnostic estimates
 the remaining KV budget as `-c` minus the full prompt plus output budgets of active requests. It records whether

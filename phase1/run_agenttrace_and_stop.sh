@@ -23,10 +23,10 @@ finish() {
 }
 trap finish EXIT
 
-export MODEL=/home/ec2-user/Qwen3-0.6B-Q8_0.gguf
-export LLAMA_SERVER=/home/ec2-user/bin/llama-server
+export MODEL="${MODEL:-/home/ec2-user/Qwen3-0.6B-Q8_0.gguf}"
+export LLAMA_SERVER="${LLAMA_SERVER:-/home/ec2-user/bin/llama-server}"
 echo "Starting AgentTrace sweep at $(date -u +%FT%TZ)."
 .venv/bin/python -u -m phase1.sweep \
     --groups baseline_agenttrace concurrency_agenttrace idle_agenttrace retention_agenttrace \
              scheduler_agenttrace arrival_agenttrace budget_agenttrace \
-    --deduplicate
+    --deduplicate "$@"

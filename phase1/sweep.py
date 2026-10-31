@@ -133,10 +133,15 @@ def main():
     p.add_argument("--redo", action="store_true", help="rerun configs that already have results")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--deduplicate", action="store_true", help="reuse identical runs across selected groups")
+    p.add_argument("--require-kv-metrics", action="store_true",
+                   help="require physical KV occupancy metrics before starting each run")
     a = p.parse_args()
     if not a.dry_run:
         check_power()
     requested = [(gname, cfg) for gname in a.groups for cfg in groups[gname]]
+    if a.require_kv_metrics:
+        for _, cfg in requested:
+            cfg.require_kv_metrics = True
     _, aliases = deduplicate_configs([cfg for _, cfg in requested]) if a.deduplicate else ([], {})
     if a.deduplicate and not a.dry_run:
         out = RESULTS / "phase1"
