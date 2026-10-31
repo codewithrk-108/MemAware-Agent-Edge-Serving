@@ -1,0 +1,13 @@
+  load_t4_part_a t4_load_v1_poisson10s_n2_ctx32k_seed2 run
+[t4_load_v1_poisson10s_n2_ctx32k_seed2] ok 50/50 failed 0 timeouts 0+0 | completion p50 193.7s p95 645.3s | queue p95 178.5s | 3.0 tasks/min | hit 0.46 | peak 703 MiB
+  load_t4_part_a t4_load_v1_poisson10s_n8_ctx32k_seed2 run
+[t4_load_v1_poisson10s_n8_ctx32k_seed2] ok 34/50 failed 16 timeouts 0+0 | completion p50 47.0s p95 118.4s | queue p95 29.0s | 3.4 tasks/min | hit 0.69 | peak 728 MiB
+  load_t4_part_a t4_load_v1_poisson5s_n2_ctx32k_seed2 run
+[t4_load_v1_poisson5s_n2_ctx32k_seed2] ok 50/50 failed 0 timeouts 0+0 | completion p50 353.9s p95 771.3s | queue p95 300.5s | 3.0 tasks/min | hit 0.49 | peak 702 MiB
+  load_t4_part_a t4_load_v1_poisson5s_n8_ctx32k_seed2 run
+[t4_load_v1_poisson5s_n8_ctx32k_seed2] ok 34/50 failed 16 timeouts 0+0 | completion p50 83.4s p95 219.5s | queue p95 76.9s | 4.1 tasks/min | hit 0.59 | peak 726 MiB
+  load_t4_part_a t4_load_v1_burst_n2_ctx32k_seed2 run
+[t4_load_v1_burst_n2_ctx32k_seed2] ok 50/50 failed 0 timeouts 0+0 | completion p50 550.3s p95 895.1s | queue p95 417.2s | 3.0 tasks/min | hit 0.49 | peak 702 MiB
+  load_t4_part_a t4_load_v1_burst_n8_ctx32k_seed2 run
+[t4_load_v1_burst_n8_ctx32k_seed2] ok 34/50 failed 16 timeouts 0+0 | completion p50 305.5s p95 429.2s | queue p95 270.9s | 4.0 tasks/min | hit 0.70 | peak 726 MiB
+wrote /home/ec2-user/phase-1-split-sweeps/results/t4_load_v1_part_a/summary.csv (6 runs)
