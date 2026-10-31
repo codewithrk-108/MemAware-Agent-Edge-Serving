@@ -1,0 +1,59 @@
+0.00.106.499 I srv  llama_server: initializing ...
+0.00.106.521 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.106.913 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.108.466 I srv    load_model: loading model '/home/ec2-user/Qwen3-0.6B-Q8_0.gguf'
+0.00.621.570 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 999, abort
+0.00.748.921 W load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.174.660 I cmn          init: llama threadpool init, n_threads = 4
+0.01.488.511 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 32768, kv_unified = 'true'
+0.01.488.593 W srv          init: --cache-idle-slots requires --cache-ram, disabling
+0.01.494.899 I srv  llama_server: model loaded
+0.01.494.908 I srv  llama_server: listening on http://127.0.0.1:8090
+0.01.615.772 I slot get_availabl: id  0 | task -1 | selected slot by LRU, n_tokens = 0, t_last = -1
+0.01.615.800 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.04.904.354 I slot print_timing: id  0 | task 0 | n_gen =    145, tg =  47.84 t/s, tg_3s =  48.17 t/s
+0.07.910.745 I slot print_timing: id  0 | task 0 | n_gen =    288, tg =  47.70 t/s, tg_3s =  47.57 t/s
+0.10.921.317 I slot print_timing: id  0 | task 0 | n_gen =    427, tg =  47.19 t/s, tg_3s =  46.17 t/s
+0.13.944.655 I slot print_timing: id  0 | task 0 | n_gen =    567, tg =  46.97 t/s, tg_3s =  46.31 t/s
+0.16.954.079 I slot print_timing: id  0 | task 0 | n_gen =    702, tg =  46.55 t/s, tg_3s =  44.86 t/s
+0.19.961.653 I slot print_timing: id  0 | task 0 | n_gen =    836, tg =  46.22 t/s, tg_3s =  44.55 t/s
+0.22.978.352 I slot print_timing: id  0 | task 0 | n_gen =    970, tg =  45.96 t/s, tg_3s =  44.42 t/s
+0.23.544.715 I slot print_timing: id  0 | task 0 | prompt eval time =     278.61 ms /  1261 tokens (    0.22 ms per token,  4526.09 tokens per second)
+0.23.544.721 I slot print_timing: id  0 | task 0 |        eval time =   21650.28 ms /   995 tokens (   21.78 ms per token,    45.91 tokens per second)
+0.23.544.721 I slot print_timing: id  0 | task 0 |       total time =   21928.88 ms /  2256 tokens
+0.23.544.727 I slot print_timing: id  0 | task 0 |    graphs reused =        990
+0.23.544.727 I slot print_timing: id  0 | task 0 |   graph reallocs =          0    /     0        (same size) / (changed size)
+0.23.544.807 I slot      release: id  0 | task 0 | stop processing: n_tokens = 2255, truncated = 0
+0.23.601.578 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.945 (> 0.100 thold), f_keep = 0.963
+0.23.601.617 I slot launch_slot_: id  0 | task 996 | processing task, is_child = 0
+0.26.672.286 I slot print_timing: id  0 | task 996 | n_gen =    130, tg =  42.85 t/s, tg_3s =  43.18 t/s
+0.29.695.034 I slot print_timing: id  0 | task 996 | n_gen =    260, tg =  42.93 t/s, tg_3s =  43.01 t/s
+0.32.703.915 I slot print_timing: id  0 | task 996 | n_gen =    384, tg =  42.36 t/s, tg_3s =  41.21 t/s
+0.33.711.633 I slot get_availabl: id  1 | task -1 | selected slot by LRU, n_tokens = 0, t_last = -1
+0.33.711.649 I slot launch_slot_: id  1 | task 1423 | processing task, is_child = 0
+0.35.712.402 I slot print_timing: id  0 | task 996 | n_gen =    483, tg =  40.00 t/s, tg_3s =  32.91 t/s
+0.37.055.750 I slot print_timing: id  1 | task 1423 | n_gen =    103, tg =  33.99 t/s, tg_3s =  34.32 t/s
+0.37.087.889 I slot print_timing: id  0 | task 996 | prompt eval time =      60.23 ms /   126 tokens (    0.48 ms per token,  2092.05 tokens per second)
+0.37.087.895 I slot print_timing: id  0 | task 996 |        eval time =   13426.01 ms /   530 tokens (   25.38 ms per token,    39.40 tokens per second)
+0.37.087.896 I slot print_timing: id  0 | task 996 |       total time =   13486.24 ms /   656 tokens
+0.37.087.897 I slot print_timing: id  0 | task 996 |    graphs reused =       1513
+0.37.087.897 I slot print_timing: id  0 | task 996 |   graph reallocs =          0    /     0        (same size) / (changed size)
+0.37.088.005 I slot      release: id  0 | task 996 | stop processing: n_tokens = 2826, truncated = 0
+0.40.079.031 I slot print_timing: id  1 | task 1423 | n_gen =    212, tg =  35.02 t/s, tg_3s =  36.05 t/s
+0.43.103.146 I slot print_timing: id  1 | task 1423 | n_gen =    322, tg =  35.48 t/s, tg_3s =  36.37 t/s
+0.46.120.288 I slot print_timing: id  1 | task 1423 | n_gen =    429, tg =  35.47 t/s, tg_3s =  35.46 t/s
+0.49.120.571 I slot print_timing: id  1 | task 1423 | n_gen =    536, tg =  35.51 t/s, tg_3s =  35.66 t/s
+0.52.129.373 I slot print_timing: id  1 | task 1423 | n_gen =    641, tg =  35.41 t/s, tg_3s =  34.90 t/s
+0.55.135.621 I slot print_timing: id  1 | task 1423 | n_gen =    746, tg =  35.34 t/s, tg_3s =  34.93 t/s
+0.58.145.732 I slot print_timing: id  1 | task 1423 | n_gen =    850, tg =  35.24 t/s, tg_3s =  34.55 t/s
+1.01.146.446 I slot print_timing: id  1 | task 1423 | n_gen =    952, tg =  35.10 t/s, tg_3s =  33.99 t/s
+1.02.629.625 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.954 (> 0.100 thold), f_keep = 0.371
+1.02.629.650 I slot launch_slot_: id  0 | task 2427 | processing task, is_child = 0
+1.04.154.396 I slot print_timing: id  1 | task 1423 | n_gen =   1049, tg =  34.82 t/s, tg_3s =  32.25 t/s
+1.05.888.069 I slot print_timing: id  0 | task 2427 | n_gen =    100, tg =  30.86 t/s, tg_3s =  31.17 t/s
+1.07.154.490 I slot print_timing: id  1 | task 1423 | n_gen =   1143, tg =  34.50 t/s, tg_3s =  31.33 t/s
+1.08.904.253 I slot print_timing: id  0 | task 2427 | n_gen =    195, tg =  31.17 t/s, tg_3s =  31.50 t/s
+1.10.154.513 I slot print_timing: id  1 | task 1423 | n_gen =   1237, tg =  34.24 t/s, tg_3s =  31.33 t/s
+1.10.187.500 W srv          stop: cancel task, id_task = 2427
+1.10.187.699 I srv    operator(): operator(): cleaning up before exit...
+1.10.187.752 W srv          stop: cancel task, id_task = 1423

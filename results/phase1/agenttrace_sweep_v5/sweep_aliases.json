@@ -1,0 +1,20 @@
+{
+  "agenttrace_baseline_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N1_poisson50_32k_v5": "agenttrace_N1_poisson50_32k_v5",
+  "agenttrace_N2_poisson50_32k_v5": "agenttrace_N2_poisson50_32k_v5",
+  "agenttrace_N4_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N8_poisson50_32k_v5": "agenttrace_N8_poisson50_32k_v5",
+  "agenttrace_N4_delay0_poisson50_32k_v5": "agenttrace_N4_delay0_poisson50_32k_v5",
+  "agenttrace_N4_delay1_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N4_default_poisson50_32k_v5": "agenttrace_N4_default_poisson50_32k_v5",
+  "agenttrace_N4_noram_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N4_noreuse_poisson50_32k_v5": "agenttrace_N4_noreuse_poisson50_32k_v5",
+  "agenttrace_N4_task_poisson50_32k_v5": "agenttrace_N4_task_poisson50_32k_v5",
+  "agenttrace_N4_request_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N8_rate0.0263158_poisson50_32k_v5": "agenttrace_N8_rate0.0263158_poisson50_32k_v5",
+  "agenttrace_N8_rate0.025_poisson50_32k_v5": "agenttrace_N8_poisson50_32k_v5",
+  "agenttrace_N8_rate0.0238095_poisson50_32k_v5": "agenttrace_N8_rate0.0238095_poisson50_32k_v5",
+  "agenttrace_N4_ctx32768_poisson50_32k_v5": "agenttrace_baseline_poisson50_32k_v5",
+  "agenttrace_N8_ctx32768_poisson50_32k_v5": "agenttrace_N8_poisson50_32k_v5",
+  "agenttrace_N16_ctx32768_poisson50_32k_v5": "agenttrace_N16_ctx32768_poisson50_32k_v5"
+}

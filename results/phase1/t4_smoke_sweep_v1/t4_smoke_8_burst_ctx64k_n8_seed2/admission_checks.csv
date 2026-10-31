@@ -1,0 +1,15 @@
+t,worker,task_index,task_id,step,queue_length_before,active_count,active_reserved_tokens,kv_capacity_tokens,kv_budget_remaining_tokens,head_prompt_tokens,head_output_budget_tokens,head_need_tokens,head_fits,fitting_later_count,smallest_fitting_later_need_tokens,backfill_opportunity,request_outcome
+0.0002787360000411354,0,0,agenttrace-nl2bash-51-qwen3-1.7b,0,1,0,0,65536,65536,1099,3867,4966,True,0,,False,ok
+0.0008007049999605442,1,1,agenttrace-mbpp-76-qwen3-0.6b,0,1,1,4966,65536,60570,1109,3501,4610,True,0,,False,ok
+0.001842883999984224,2,2,agenttrace-nl2bash-92-qwen3-1.7b,0,1,2,9576,65536,55960,1088,1655,2743,True,0,,False,ok
+0.0023330919999580146,3,3,agenttrace-mbpp-58-qwen3-0.6b,0,1,3,12319,65536,53217,1113,1623,2736,True,0,,False,ok
+0.002818802999968284,4,4,agenttrace-mbpp-72-qwen3-1.7b,0,1,4,15055,65536,50481,1108,2886,3994,True,0,,False,ok
+0.003421146000050612,5,5,agenttrace-mbpp-197-qwen3-1.7b,0,1,5,19049,65536,46487,1261,995,2256,True,0,,False,ok
+0.004043628999966131,6,6,agenttrace-mbpp-55-qwen3-1.7b,0,1,6,21305,65536,44231,1109,5632,6741,True,0,,False,ok
+0.0048079209999514205,7,7,agenttrace-nl2bash-197-qwen3-0.6b,0,1,7,28046,65536,37490,1084,780,1864,True,0,,False,ok
+18.78880534999996,7,7,agenttrace-nl2bash-197-qwen3-0.6b,1,1,6,25790,65536,39746,1881,152,2033,True,0,,False,ok
+18.808743054000047,5,5,agenttrace-mbpp-197-qwen3-1.7b,1,1,7,27823,65536,37713,2298,530,2828,True,0,,False,ok
+34.02185033000001,7,2,agenttrace-nl2bash-92-qwen3-1.7b,1,1,4,20311,65536,45225,2762,926,3688,True,0,,False,ok
+76.93530640100005,5,0,agenttrace-nl2bash-51-qwen3-1.7b,1,1,1,6741,65536,58795,5018,873,5891,True,0,,False,ok
+109.20721914600006,3,6,agenttrace-mbpp-55-qwen3-1.7b,1,1,0,0,65536,65536,6783,3795,10578,True,0,,False,ok
+186.39357758999995,2,6,agenttrace-mbpp-55-qwen3-1.7b,2,1,0,0,65536,65536,10581,4126,14707,True,0,,False,ok

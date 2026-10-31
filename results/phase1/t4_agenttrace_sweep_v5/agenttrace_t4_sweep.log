@@ -1,0 +1,32 @@
+Starting AgentTrace sweep at 2026-10-30T19:52:41Z.
+baseline_agenttrace agenttrace_baseline_poisson50_32k_v5 run
+[agenttrace_baseline_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.8s p95 150.0s | queue p95 0.0s | 1.5 tasks/min | hit 0.89 | peak 724 MiB
+concurrency_agenttrace agenttrace_N1_poisson50_32k_v5 run
+[agenttrace_N1_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 38.6s p95 169.1s | queue p95 39.8s | 1.6 tasks/min | hit 0.59 | peak 711 MiB
+concurrency_agenttrace agenttrace_N2_poisson50_32k_v5 run
+[agenttrace_N2_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 23.3s p95 143.9s | queue p95 7.2s | 1.6 tasks/min | hit 0.84 | peak 717 MiB
+concurrency_agenttrace agenttrace_N4_poisson50_32k_v5 reuse agenttrace_baseline_poisson50_32k_v5
+concurrency_agenttrace agenttrace_N8_poisson50_32k_v5 run
+[agenttrace_N8_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.6s p95 148.8s | queue p95 0.0s | 1.5 tasks/min | hit 0.92 | peak 737 MiB
+ idle_agenttrace agenttrace_N4_delay0_poisson50_32k_v5 run
+[agenttrace_N4_delay0_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 31.8s p95 143.2s | queue p95 0.0s | 1.5 tasks/min | hit 0.95 | peak 727 MiB
+ idle_agenttrace agenttrace_N4_delay1_poisson50_32k_v5 reuse agenttrace_baseline_poisson50_32k_v5
+retention_agenttrace agenttrace_N4_default_poisson50_32k_v5 run
+[agenttrace_N4_default_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 22.0s p95 138.5s | queue p95 0.1s | 1.6 tasks/min | hit 0.93 | peak 8902 MiB
+retention_agenttrace agenttrace_N4_noram_poisson50_32k_v5 reuse agenttrace_baseline_poisson50_32k_v5
+retention_agenttrace agenttrace_N4_noreuse_poisson50_32k_v5 run
+[agenttrace_N4_noreuse_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 34.3s p95 164.2s | queue p95 0.0s | 1.5 tasks/min | hit 0.00 | peak 732 MiB
+scheduler_agenttrace agenttrace_N4_task_poisson50_32k_v5 run
+[agenttrace_N4_task_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.1s p95 148.7s | queue p95 0.0s | 1.5 tasks/min | hit 0.92 | peak 724 MiB
+scheduler_agenttrace agenttrace_N4_request_poisson50_32k_v5 reuse agenttrace_baseline_poisson50_32k_v5
+arrival_agenttrace agenttrace_N8_rate0.0263158_poisson50_32k_v5 run
+[agenttrace_N8_rate0.0263158_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.7s p95 148.7s | queue p95 0.0s | 1.6 tasks/min | hit 0.93 | peak 740 MiB
+arrival_agenttrace agenttrace_N8_rate0.025_poisson50_32k_v5 reuse agenttrace_N8_poisson50_32k_v5
+arrival_agenttrace agenttrace_N8_rate0.0238095_poisson50_32k_v5 run
+[agenttrace_N8_rate0.0238095_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.6s p95 149.3s | queue p95 0.0s | 1.5 tasks/min | hit 0.90 | peak 741 MiB
+budget_agenttrace agenttrace_N4_ctx32768_poisson50_32k_v5 reuse agenttrace_baseline_poisson50_32k_v5
+budget_agenttrace agenttrace_N8_ctx32768_poisson50_32k_v5 reuse agenttrace_N8_poisson50_32k_v5
+budget_agenttrace agenttrace_N16_ctx32768_poisson50_32k_v5 run
+[agenttrace_N16_ctx32768_poisson50_32k_v5] ok 50/50 failed 0 timeouts 0+0 | completion p50 32.7s p95 148.5s | queue p95 0.0s | 1.5 tasks/min | hit 0.95 | peak 748 MiB
+wrote /home/ec2-user/phase-1-fastllamacpp/results/phase1/summary.csv (15 runs)
+Sweep exited with status 0; requesting instance shutdown.
