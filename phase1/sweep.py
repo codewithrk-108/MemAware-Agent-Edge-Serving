@@ -107,6 +107,16 @@ def grid() -> dict:
         if name.endswith("_agenttrace"):
             for cfg in configs:
                 cfg.name += "_poisson50_32k_v5"
+    # Balanced two-instance deployment of the same twelve load points.
+    # Saved tool delays remain enabled in every run; only load/concurrency vary.
+    for part, concurrencies in (("a", (2, 8)), ("b", (4, 16))):
+        g[f"load_t4_part_{part}"] = [
+            base(f"t4_load_v1_{pattern}_n{n}_ctx32k_seed2", AGENTTRACE,
+                 concurrency=n, ctx=32768, arrival_rate=rate,
+                 require_kv_metrics=True)
+            for pattern, rate in (("poisson10s", 0.1), ("poisson5s", 0.2), ("burst", 0.0))
+            for n in concurrencies
+        ]
     return g
 
 
@@ -135,6 +145,7 @@ def main():
     p.add_argument("--deduplicate", action="store_true", help="reuse identical runs across selected groups")
     p.add_argument("--require-kv-metrics", action="store_true",
                    help="require physical KV occupancy metrics before starting each run")
+    p.add_argument("--output-group", default="phase1", help="results subdirectory for this sweep")
     a = p.parse_args()
     if not a.dry_run:
         check_power()
@@ -144,7 +155,7 @@ def main():
             cfg.require_kv_metrics = True
     _, aliases = deduplicate_configs([cfg for _, cfg in requested]) if a.deduplicate else ([], {})
     if a.deduplicate and not a.dry_run:
-        out = RESULTS / "phase1"
+        out = RESULTS / a.output_group
         out.mkdir(parents=True, exist_ok=True)
         (out / "sweep_aliases.json").write_text(json.dumps(aliases, indent=2) + "\n")
     for gname, cfg in requested:
@@ -152,19 +163,19 @@ def main():
         if target != cfg.name:
             print(f"{gname:>16} {cfg.name} reuse {target}", flush=True)
             continue
-        done = (RESULTS / "phase1" / cfg.name / "meta.json").exists()
+        done = (RESULTS / a.output_group / cfg.name / "meta.json").exists()
         print(f"{gname:>16} {cfg.name:<18} {'skip (done)' if done and not a.redo else 'run'}", flush=True)
         if a.dry_run or (done and not a.redo):
             continue
-        execute(copy.deepcopy(cfg))
+        execute(copy.deepcopy(cfg), group=a.output_group)
     if a.dry_run:
         return
     rows = []
-    for meta in sorted((RESULTS / "phase1").glob("*/meta.json")):
+    for meta in sorted((RESULTS / a.output_group).glob("*/meta.json")):
         rows.append(json.loads(meta.read_text())["summary"])
     if rows:
-        pd.DataFrame(rows).to_csv(RESULTS / "phase1/summary.csv", index=False)
-        print(f"wrote {RESULTS / 'phase1/summary.csv'} ({len(rows)} runs)")
+        pd.DataFrame(rows).to_csv(RESULTS / a.output_group / "summary.csv", index=False)
+        print(f"wrote {RESULTS / a.output_group / 'summary.csv'} ({len(rows)} runs)")
 
 
 if __name__ == "__main__":

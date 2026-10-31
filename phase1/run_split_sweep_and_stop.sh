@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Run in a dedicated checkout/branch. Only approve shutdown after verifying EC2 Stop behavior.
+set -eu
+part="${1:?usage: run_split_sweep_and_stop.sh a|b}"
+case "$part" in a|b) ;; *) echo 'Part must be a or b' >&2; exit 2 ;; esac
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+: "${MODEL:?Set MODEL to the fixed GGUF file}"
+: "${LLAMA_SERVER:?Set LLAMA_SERVER to the validated instrumented binary}"
+group="t4_load_v1_part_$part"
+out="results/$group"
+mkdir -p "$out"
+commit_log="$root/../${group}_commit.log"
+
+finish() {
+    sweep_code=$?
+    trap - EXIT
+    set +e
+    printf 'finished_utc=%s\nsweep_exit_code=%s\n' "$(date -u +%FT%TZ)" "$sweep_code" > "$out/status.txt"
+    if [ -n "${SWEEP_LOG:-}" ] && [ -f "$SWEEP_LOG" ]; then cp "$SWEEP_LOG" "$out/sweep.log"; fi
+    sync
+    git add -- "$out" && git commit -m "Record T4 load sweep part $part results" > "$commit_log" 2>&1
+    commit_code=$?
+    if [ "$commit_code" -ne 0 ]; then
+        echo "Result commit failed; instance left running. See $commit_log" >&2
+        exit 1
+    fi
+    git rev-parse HEAD > "$root/../${group}_result_commit.txt"
+    sync
+    if [ -f "$root/.shutdown-approved" ]; then
+        echo 'Results committed; requesting instance stop through verified shutdown behavior.'
+        sudo -n shutdown -h now || { echo 'Shutdown failed; stop the instance manually.' >&2; exit 1; }
+    else
+        echo 'Results committed. Shutdown approval marker absent; instance left running.'
+    fi
+    exit "$sweep_code"
+}
+trap finish EXIT
+
+{
+    printf 'started_utc=%s\npart=%s\n' "$(date -u +%FT%TZ)" "$part"
+    hostname
+    git rev-parse HEAD
+    sha256sum "$MODEL" "$LLAMA_SERVER" data/traces/agenttrace_50_seed2.jsonl
+    sha256sum runtime/llama-b11780-kv-occupancy.patch
+    for library in "$(dirname "$LLAMA_SERVER")"/*.so*; do
+        if [ -f "$library" ]; then sha256sum "$library"; fi
+    done
+    .venv/bin/python --version
+    nvidia-smi --query-gpu=name,uuid,driver_version,memory.total --format=csv
+    "$LLAMA_SERVER" --version
+} > "$out/provenance.txt" 2>&1
+.venv/bin/python -u -m phase1.sweep --groups "load_t4_part_$part" \
+    --output-group "$group" --require-kv-metrics
