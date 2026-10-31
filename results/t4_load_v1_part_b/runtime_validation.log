@@ -1,0 +1,36 @@
+[kv] ok 1/1 failed 0 timeouts 0+0 | completion p50 0.7s p95 0.7s | queue p95 0.0s | 88.9 tasks/min | hit 0.64 | peak 644 MiB
+{
+  "initial": {
+    "t": 2398.443539323,
+    "used_cells": 0,
+    "capacity_cells": 512,
+    "usage_ratio": 0.0,
+    "requests_processing": 0
+  },
+  "retained_idle": {
+    "t": 2398.776938156,
+    "used_cells": 127,
+    "capacity_cells": 512,
+    "usage_ratio": 0.248046875,
+    "requests_processing": 0
+  },
+  "after_erase": {
+    "t": 2398.777790522,
+    "used_cells": 0,
+    "capacity_cells": 512,
+    "usage_ratio": 0.0,
+    "requests_processing": 0
+  },
+  "exporter_sampler": {
+    "kv_measurement": "physical_cells",
+    "kv_peak_used_cells": 121,
+    "kv_capacity_cells": 512,
+    "kv_peak_usage_ratio": 0.236328125,
+    "kv_sample_count": 5,
+    "kv_sampling_interval_s": 0.1,
+    "kv_sampling_error": null,
+    "kv_sampling_error_count": 0
+  },
+  "runner_samples": 2,
+  "runner_peak_used_cells": 199
+}
