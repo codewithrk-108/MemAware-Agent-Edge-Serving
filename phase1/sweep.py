@@ -123,6 +123,11 @@ def grid() -> dict:
                  concurrency=n, ctx=65536, arrival_rate=0.2,
                  require_kv_metrics=True)
         ]
+    g["smoke64k_poisson2s_t4_n16"] = [
+        base("t4_smoke_poisson2s_50_ctx64k_n16_seed2", AGENTTRACE,
+             concurrency=16, ctx=65536, arrival_rate=0.5,
+             require_kv_metrics=True)
+    ]
     return g
 
 

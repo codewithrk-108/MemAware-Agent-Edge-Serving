@@ -4,6 +4,17 @@ from phase1.sweep import grid
 
 
 class T4LoadSweepTest(unittest.TestCase):
+    def test_2s_64k_smoke_changes_only_arrival_rate(self):
+        from dataclasses import asdict
+        groups = grid()
+        reference = asdict(groups['smoke64k_t4_n16'][0])
+        faster = asdict(groups['smoke64k_poisson2s_t4_n16'][0])
+        self.assertEqual(faster.pop('arrival_rate'), 0.5)
+        reference.pop('arrival_rate')
+        faster.pop('name')
+        reference.pop('name')
+        self.assertEqual(faster, reference)
+
     def test_64k_poisson_smokes_match_32k_workload(self):
         groups = grid()
         for n in (8, 16):
