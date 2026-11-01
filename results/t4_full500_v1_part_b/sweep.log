@@ -1,0 +1,9 @@
+full500_t4_part_b t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2 run
+[t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2] ok 472/500 failed 28 timeouts 0+0 | completion p50 3984.3s p95 5420.4s | queue p95 2932.8s | 4.3 tasks/min | hit 0.43 | peak 718 MiB
+full500_t4_part_b t4_full500_v1_c6_n4_burst_ctx32k_seed2 run
+[t4_full500_v1_c6_n4_burst_ctx32k_seed2] ok 476/500 failed 24 timeouts 0+0 | completion p50 4241.4s p95 6049.6s | queue p95 3405.2s | 4.3 tasks/min | hit 0.43 | peak 718 MiB
+full500_t4_part_b t4_full500_v1_c7_n16_poisson2s_ctx64k_seed2 run
+[t4_full500_v1_c7_n16_poisson2s_ctx64k_seed2] ok 340/500 failed 160 timeouts 0+0 | completion p50 1959.4s p95 3631.0s | queue p95 2065.3s | 4.5 tasks/min | hit 0.56 | peak 801 MiB
+full500_t4_part_b t4_full500_v1_c5_n16_poisson2s_ctx32k_seed2 run
+[t4_full500_v1_c5_n16_poisson2s_ctx32k_seed2] ok 100/500 failed 400 timeouts 0+0 | completion p50 126.7s p95 269.6s | queue p95 114.0s | 5.5 tasks/min | hit 0.17 | peak 739 MiB
+wrote /home/ec2-user/phase-1-full500-v1/results/t4_full500_v1_part_b/summary.csv (4 runs)
