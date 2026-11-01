@@ -4,6 +4,18 @@ from phase1.sweep import grid
 
 
 class T4LoadSweepTest(unittest.TestCase):
+    def test_64k_poisson_smokes_match_32k_workload(self):
+        groups = grid()
+        for n in (8, 16):
+            configs = groups[f'smoke64k_t4_n{n}']
+            self.assertEqual(len(configs), 1)
+            cfg = configs[0]
+            self.assertEqual((cfg.concurrency, cfg.server.ctx, cfg.arrival_rate), (n, 65536, 0.2))
+            self.assertEqual((cfg.n_tasks, cfg.seed, cfg.delay_scale), (50, 2, 1))
+            self.assertEqual(cfg.trace, 'data/traces/agenttrace_50_seed2.jsonl')
+            self.assertTrue(cfg.require_kv_metrics)
+            self.assertEqual(cfg.server.cache_ram, 0)
+
     def test_two_parts_cover_all_twelve_controlled_runs(self):
         groups = grid()
         parts = [groups['load_t4_part_a'], groups['load_t4_part_b']]

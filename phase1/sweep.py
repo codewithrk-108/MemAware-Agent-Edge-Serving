@@ -117,6 +117,12 @@ def grid() -> dict:
             for pattern, rate in (("poisson10s", 0.1), ("poisson5s", 0.2), ("burst", 0.0))
             for n in concurrencies
         ]
+    for n in (8, 16):
+        g[f"smoke64k_t4_n{n}"] = [
+            base(f"t4_smoke_poisson5s_50_ctx64k_n{n}_seed2", AGENTTRACE,
+                 concurrency=n, ctx=65536, arrival_rate=0.2,
+                 require_kv_metrics=True)
+        ]
     return g
 
 

@@ -7,7 +7,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 : "${MODEL:?Set MODEL to the fixed GGUF file}"
 : "${LLAMA_SERVER:?Set LLAMA_SERVER to the validated instrumented binary}"
-group="t4_load_v1_part_$part"
+group="${OUTPUT_GROUP:-t4_load_v1_part_$part}"
+sweep_group="${SWEEP_GROUP:-load_t4_part_$part}"
+commit_message="${RESULT_COMMIT_MESSAGE:-Record T4 load sweep part $part results}"
 out="results/$group"
 mkdir -p "$out"
 commit_log="$root/../${group}_commit.log"
@@ -19,7 +21,7 @@ finish() {
     printf 'finished_utc=%s\nsweep_exit_code=%s\n' "$(date -u +%FT%TZ)" "$sweep_code" > "$out/status.txt"
     if [ -n "${SWEEP_LOG:-}" ] && [ -f "$SWEEP_LOG" ]; then cp "$SWEEP_LOG" "$out/sweep.log"; fi
     sync
-    git add -- "$out" && git commit -m "Record T4 load sweep part $part results" > "$commit_log" 2>&1
+    git add -- "$out" && git commit -m "$commit_message" > "$commit_log" 2>&1
     commit_code=$?
     if [ "$commit_code" -ne 0 ]; then
         echo "Result commit failed; instance left running. See $commit_log" >&2
@@ -50,5 +52,5 @@ trap finish EXIT
     nvidia-smi --query-gpu=name,uuid,driver_version,memory.total --format=csv
     "$LLAMA_SERVER" --version
 } > "$out/provenance.txt" 2>&1
-.venv/bin/python -u -m phase1.sweep --groups "load_t4_part_$part" \
+.venv/bin/python -u -m phase1.sweep --groups "$sweep_group" \
     --output-group "$group" --require-kv-metrics

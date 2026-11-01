@@ -38,3 +38,13 @@ Without the marker, or on a commit failure, the instance remains running.
 Result commits remain on each instance's EBS-backed results branch. No GitHub
 credentials are copied to the instances. Stopping preserves this disk; fetch the
 result branches after restart to publish them. Do not terminate/delete the disks.
+
+## Matched 64K, Poisson-5s smokes
+
+`smoke64k_t4_n8` and `smoke64k_t4_n16` each run the same 50 tasks and seed with
+65536 KV cells, 0.2 tasks/s Poisson arrivals, saved tool delays at scale 1, host
+cache off, and required physical KV metrics. The other settings match the 32K
+load sweep. Use clean checkouts to preserve existing work on either instance.
+The launcher accepts `SWEEP_GROUP` and `OUTPUT_GROUP` overrides, plus an optional
+`RESULT_COMMIT_MESSAGE`; its default part-A/B behavior is unchanged. Use separate
+output groups `t4_smoke64k_poisson5s_n8_v1` and `t4_smoke64k_poisson5s_n16_v1`.
