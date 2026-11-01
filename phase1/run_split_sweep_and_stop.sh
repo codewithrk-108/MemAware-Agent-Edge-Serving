@@ -28,6 +28,23 @@ finish() {
         exit 1
     fi
     git rev-parse HEAD > "$root/../${group}_result_commit.txt"
+    if [ "${PUSH_RESULTS:-0}" = 1 ]; then
+        branch="$(git branch --show-current)"
+        case "$branch" in results/*) ;; *) echo 'Refusing to push results outside a results/* branch.' >&2; exit 1 ;; esac
+        push_ok=0
+        for attempt in 1 2 3; do
+            if git push --set-upstream origin "HEAD:refs/heads/$branch" > "$root/../${group}_push.log" 2>&1; then
+                push_ok=1
+                break
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep "${PUSH_RETRY_DELAY:-15}"; fi
+        done
+        if [ "$push_ok" -ne 1 ]; then
+            echo 'Result push failed; committed results preserved and instance left running.' >&2
+            exit 1
+        fi
+        if [ -n "${PHASE1_GITHUB_CREDENTIAL:-}" ]; then rm -f -- "$PHASE1_GITHUB_CREDENTIAL"; fi
+    fi
     sync
     if [ -f "$root/.shutdown-approved" ]; then
         echo 'Results committed; requesting instance stop through verified shutdown behavior.'
@@ -43,7 +60,7 @@ trap finish EXIT
     printf 'started_utc=%s\npart=%s\n' "$(date -u +%FT%TZ)" "$part"
     hostname
     git rev-parse HEAD
-    sha256sum "$MODEL" "$LLAMA_SERVER" data/traces/agenttrace_50_seed2.jsonl
+    sha256sum "$MODEL" "$LLAMA_SERVER" "${TRACE_FILE:-data/traces/agenttrace_50_seed2.jsonl}"
     sha256sum runtime/llama-b11780-kv-occupancy.patch
     for library in "$(dirname "$LLAMA_SERVER")"/*.so*; do
         if [ -f "$library" ]; then sha256sum "$library"; fi

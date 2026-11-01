@@ -4,6 +4,23 @@ from phase1.sweep import grid
 
 
 class T4LoadSweepTest(unittest.TestCase):
+    def test_full_grid_matches_seven_approved_configs_and_split(self):
+        groups = grid()
+        a, b = groups['full500_t4_part_a'], groups['full500_t4_part_b']
+        self.assertEqual([(c.concurrency, c.arrival_rate, c.server.ctx) for c in a],
+                         [(1, 0.1, 32768), (4, 0.2, 32768), (16, 0.2, 32768)])
+        self.assertEqual([(c.concurrency, c.arrival_rate, c.server.ctx) for c in b],
+                         [(4, 0.5, 32768), (4, 0, 32768), (16, 0.5, 65536), (16, 0.5, 32768)])
+        self.assertEqual(len({c.name for c in a + b}), 7)
+        for cfg in a + b:
+            self.assertEqual(cfg.trace, 'data/traces/agenttrace_full_500_seed2.jsonl')
+            self.assertEqual((cfg.n_tasks, cfg.seed, cfg.delay_scale), (500, 2, 1))
+            self.assertEqual(cfg.scheduler, 'request')
+            self.assertTrue(cfg.require_kv_metrics)
+            self.assertTrue(cfg.cache_prompt)
+            self.assertEqual(cfg.server.cache_ram, 0)
+            self.assertEqual((cfg.deadline_s, cfg.request_timeout_s), (21600, 1800))
+
     def test_2s_64k_smoke_changes_only_arrival_rate(self):
         from dataclasses import asdict
         groups = grid()

@@ -7,7 +7,7 @@ import unittest
 
 
 class SplitLauncherTest(unittest.TestCase):
-    def launch(self, code=0, approve=True, reject_commit=False):
+    def launch(self, code=0, approve=True, reject_commit=False, push=False, push_fail=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / 'repo'
             (root / 'phase1').mkdir(parents=True)
@@ -27,7 +27,7 @@ class SplitLauncherTest(unittest.TestCase):
                 '.venv/bin/python': f'#!/bin/sh\nif [ "$1" = --version ]; then echo Python; exit 0; fi\necho result > results/t4_load_v1_part_a/raw.csv\nexit {code}\n',
                 'bin/server': '#!/bin/sh\necho runtime-version\n',
                 'bin/nvidia-smi': '#!/bin/sh\necho T4\n',
-                'bin/sudo': '#!/bin/sh\ngit log -1 --format=%s > "$TEST_STOP_LOG"\n',
+                'bin/sudo': '#!/bin/sh\nif [ "$TEST_EXPECT_PUSH" = 1 ]; then test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/results/test | cut -f1)" || exit 1; fi\ngit log -1 --format=%s > "$TEST_STOP_LOG"\n',
             }.items():
                 path = root / name
                 path.write_text(content)
@@ -40,6 +40,16 @@ class SplitLauncherTest(unittest.TestCase):
             git('config', 'user.email', 'test@example.com')
             git('add', 'phase1/run.sh')
             git('commit', '-m', 'setup')
+            git('checkout', '-b', 'results/test')
+            credential = Path(tmp) / 'credential.json'
+            if push:
+                remote = Path(tmp) / 'remote.git'
+                if not push_fail:
+                    git('init', '--bare', str(remote))
+                git('remote', 'add', 'origin', str(remote))
+                credential.write_text('temporary test credential')
+                env.update(PUSH_RESULTS='1', PUSH_RETRY_DELAY='0', TEST_EXPECT_PUSH='1',
+                           PHASE1_GITHUB_CREDENTIAL=str(credential))
             (root / 'unrelated').write_text('keep untracked')
             if approve:
                 (root / '.shutdown-approved').touch()
@@ -50,9 +60,11 @@ class SplitLauncherTest(unittest.TestCase):
             result = subprocess.run(['bash', str(root / 'phase1/run.sh'), 'a'], cwd=root,
                                     env=env, text=True, capture_output=True, timeout=10)
             self.assertEqual(git('ls-files', 'unrelated'), '')
-            if reject_commit:
+            if reject_commit or push_fail:
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse((root / 'stop.log').exists())
+                if push_fail:
+                    self.assertTrue(credential.exists())
             else:
                 self.assertEqual(result.returncode, code, result.stderr)
                 self.assertEqual(git('log', '-1', '--format=%s'), 'Record T4 load sweep part a results')
@@ -62,6 +74,10 @@ class SplitLauncherTest(unittest.TestCase):
                 if approve:
                     self.assertEqual((root / 'stop.log').read_text().strip(),
                                      'Record T4 load sweep part a results')
+                if push:
+                    self.assertFalse(credential.exists())
+                    self.assertEqual(git('ls-remote', 'origin', 'refs/heads/results/test').split()[0],
+                                     git('rev-parse', 'HEAD'))
 
     def test_commits_results_before_stop(self):
         self.launch()
@@ -74,3 +90,9 @@ class SplitLauncherTest(unittest.TestCase):
 
     def test_unconfirmed_shutdown_leaves_instance_running(self):
         self.launch(approve=False)
+
+    def test_pushes_results_and_removes_temporary_credentials_before_stop(self):
+        self.launch(push=True)
+
+    def test_push_failure_preserves_results_and_leaves_instance_running(self):
+        self.launch(push=True, push_fail=True)

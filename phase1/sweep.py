@@ -128,6 +128,24 @@ def grid() -> dict:
              concurrency=16, ctx=65536, arrival_rate=0.5,
              require_kv_metrics=True)
     ]
+    full_workload = {**AGENTTRACE, 'trace': 'data/traces/agenttrace_full_500_seed2.jsonl',
+                     'n_tasks': 500, 'deadline_s': 21600, 'request_timeout_s': 1800}
+    full_specs = {
+        'a': [(1, 1, 'poisson10s', 0.1, 32768),
+              (2, 4, 'poisson5s', 0.2, 32768),
+              (3, 16, 'poisson5s', 0.2, 32768)],
+        'b': [(4, 4, 'poisson2s', 0.5, 32768),
+              (6, 4, 'burst', 0.0, 32768),
+              (7, 16, 'poisson2s', 0.5, 65536),
+              (5, 16, 'poisson2s', 0.5, 32768)],
+    }
+    for part, specs in full_specs.items():
+        g[f'full500_t4_part_{part}'] = [
+            base(f't4_full500_v1_c{number}_n{n}_{pattern}_ctx{ctx // 1024}k_seed2',
+                 full_workload, concurrency=n, ctx=ctx, arrival_rate=rate,
+                 cache_ram=0, require_kv_metrics=True)
+            for number, n, pattern, rate, ctx in specs
+        ]
     return g
 
 
