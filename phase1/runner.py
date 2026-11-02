@@ -39,7 +39,7 @@ ADMISSION_CHECK_COLUMNS = (
 @dataclass
 class RunConfig:
     name: str
-    trace: str = "data/traces/synthetic.jsonl"
+    trace: str = "data/traces/agenttrace_50_seed2.jsonl"
     n_tasks: int = 100
     arrival_rate: float = 0.5        # tasks per second, Poisson; <= 0: all tasks arrive at t = 0
     concurrency: int = 8             # tasks admitted at once (FIFO workers)
@@ -465,7 +465,7 @@ def execute(cfg: RunConfig, group: str = "phase1") -> dict:
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--name", default="adhoc")
-    p.add_argument("--trace", default="data/traces/synthetic.jsonl")
+    p.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
     p.add_argument("--n-tasks", type=int, default=100)
     p.add_argument("--rate", type=float, default=0.5)
     p.add_argument("--concurrency", type=int, default=8)
