@@ -92,6 +92,6 @@
     "span_s": 38.521063457941636,
     "srv_prompt_tokens_cached_total": 8312.0
   },
-  "server_args": "/private/tmp/agent-edge-llama-b11780/llama-b11780/llama-server -m /Users/parthgujarathi/Documents/291A-Systems for LLMS/models/Qwen3-0.6B-Q8_0.gguf -c 16384 -np 4 --port 8090 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none",
+  "server_args": "/private/tmp/agent-edge-llama-b11780/llama-b11780/llama-server -m <workspace>/models/Qwen3-0.6B-Q8_0.gguf -c 16384 -np 4 --port 8090 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none",
   "doc": "Phase 1 baseline: FIFO queue with fixed concurrency in front of llama-server.\n\nTasks arrive open-loop (Poisson) and wait in one FIFO queue. The default request scheduler runs one model step per\ndequeue and releases its worker while the tool runs outside the FIFO. When the tool finishes, its response is\nappended and the next step joins the FIFO tail as runnable work. The optional task scheduler has N workers run\nwhole tasks, holding workers through tool waits.\nllama-server gets N slots, so the Python scheduler decides admission.\n\nA task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.\n"
 }
