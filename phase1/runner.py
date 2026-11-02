@@ -40,7 +40,7 @@ ADMISSION_CHECK_COLUMNS = (
 class RunConfig:
     name: str
     trace: str = "data/traces/agenttrace_50_seed2.jsonl"
-    n_tasks: int = 100
+    n_tasks: int = 50
     arrival_rate: float = 0.5        # tasks per second, Poisson; <= 0: all tasks arrive at t = 0
     concurrency: int = 8             # tasks admitted at once (FIFO workers)
     delay_scale: float = 1.0         # multiplies every tool delay; 0 removes idle periods
@@ -466,7 +466,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--name", default="adhoc")
     p.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
-    p.add_argument("--n-tasks", type=int, default=100)
+    p.add_argument("--n-tasks", type=int, default=50)
     p.add_argument("--rate", type=float, default=0.5)
     p.add_argument("--concurrency", type=int, default=8)
     p.add_argument("--ctx", type=int, default=16384)
@@ -474,6 +474,7 @@ def main():
     p.add_argument("--no-cache-prompt", action="store_true")
     p.add_argument("--delay-scale", type=float, default=1.0)
     p.add_argument("--deadline", type=float, default=240.0)
+    p.add_argument("--request-timeout", type=float, default=180.0)
     p.add_argument("--scheduler", choices=("task", "request"), default="request")
     p.add_argument("--require-kv-metrics", action="store_true",
                    help="require instrumented runtime physical KV-cell metrics before replay")
@@ -483,6 +484,7 @@ def main():
     check_power(a.allow_battery)
     cfg = RunConfig(name=a.name, trace=a.trace, n_tasks=a.n_tasks, arrival_rate=a.rate, concurrency=a.concurrency,
                     delay_scale=a.delay_scale, cache_prompt=not a.no_cache_prompt, deadline_s=a.deadline,
+                    request_timeout_s=a.request_timeout,
                     scheduler=a.scheduler, require_kv_metrics=a.require_kv_metrics, seed=a.seed,
                     server=ServerConfig(ctx=a.ctx, cache_ram=a.cache_ram, mmap=False))
     execute(cfg)
