@@ -1,7 +1,7 @@
 [project]
 name = "agent-edge-serving"
 version = "0.1.0"
-description = "Add your description here"
+description = "Replay harness and FIFO baselines for memory-aware scheduling of multi-step LLM agents"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.14.5",
@@ -9,14 +9,11 @@ dependencies = [
     "numpy>=2.5.4",
     "pandas>=3.0.6",
     "psutil>=7.2.2",
-    "pyarrow>=26.0.0",
-    "pyyaml>=6.0.3",
     "tokenizers==0.22.1",
 ]
 
-[project.scripts]
-agent-edge-serving = "agent_edge_serving:main"
+[dependency-groups]
+dev = ["pytest>=8"]
 
-[build-system]
-requires = ["uv_build>=0.12.17,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false
