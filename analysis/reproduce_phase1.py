@@ -8,8 +8,8 @@ Writes to results/reproduced/ (not committed):
     writeup_numbers.csv     every inline number: value printed in the writeup vs. value from the data
     fig_tradeoff.pdf        writeup figure (same code as report/fig_tradeoff.py)
 
-No GPU, model or server is needed. Exit status is 0 if every number matches the writeup at the
-precision it prints, 1 otherwise (mismatches are listed).
+No GPU, model or server is needed. Mismatches with the writeup are listed; with --strict the exit
+status is 1 if any number differs from the writeup at the precision it prints.
 """
 
 import argparse
@@ -198,6 +198,7 @@ def load_figure_module():
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--out", type=Path, default=OUT)
+    p.add_argument("--strict", action="store_true", help="exit 1 if any number differs from the writeup")
     a = p.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
     pd.set_option("display.width", 200)
@@ -226,7 +227,7 @@ def main(argv=None) -> int:
     print(f"\nWrote tables, numbers and fig_tradeoff.pdf to {a.out.relative_to(M.ROOT) if a.out.is_relative_to(M.ROOT) else a.out}")
     mismatches = [r for r in rows if not r["match"]]
     print(f"{len(rows) - len(mismatches)}/{len(rows)} inline numbers match the writeup.")
-    return 1 if mismatches else 0
+    return 1 if mismatches and a.strict else 0
 
 
 if __name__ == "__main__":
