@@ -1,16 +1,13 @@
-"""Phase 1 experiment grid. Every group varies one factor against the same baseline:
+"""Phase 1 experiment grid on the AgentTrace workloads.
 
-    baseline: FIFO, model and precision fixed, KV budget -c 16384, server defaults otherwise
-              (host prompt cache on), weights loaded into RAM so the footprint counts everything
+    baseline/concurrency/idle/retention/scheduler/arrival/budget_agenttrace
+                     Poisson-40 s sweeps on the 50-task trace (writeup S1/S2)
+    smoke_t4         short burst checks on the T4 (writeup S1)
+    load_t4_part_*   instrumented 12-run grid, N x arrival pattern (writeup S3)
+    smoke64k_*       64K-pool smoke checks
+    full500_t4_part_*  the seven 500-task runs R1-R7
 
-    concurrency_*  N = 1..32 admitted tasks                -> throughput vs latency, where completed work peaks
-    budget_syn     KV budget 8k / 32k tokens at N = 16      -> memory pressure: failures vs budget
-    idle_syn       tool delays x0 / x4 at N = 8             -> cost of idle periods between agent steps
-    retention_*    host prompt cache off, prefix reuse off  -> do retained contexts / reusable prefixes matter
-    scheduler       task FIFO vs request FIFO at N = 8       -> does releasing workers during tools help
-    agenttrace_*    reliable and stress grids on AgentTrace  -> same questions on recorded agent trajectories
-
-Runs already in results/phase1 are skipped, so an interrupted sweep resumes.
+Runs that already have results/<group>/<name>/meta.json are skipped, so an interrupted sweep resumes.
 """
 
 import argparse
@@ -24,12 +21,9 @@ from harness.results import RESULTS, check_power
 from harness.server import ServerConfig
 from phase1.runner import RunConfig, execute
 
-SYN = dict(trace="data/traces/synthetic.jsonl", n_tasks=100, arrival_rate=0.4)
-AI = dict(trace="data/traces/agentinstruct.jsonl", n_tasks=150, arrival_rate=0.8)
 AGENTTRACE = dict(trace="data/traces/agenttrace_50_seed2.jsonl", n_tasks=50,
                   arrival_rate=0.025, deadline_s=14400, request_timeout_s=900, seed=2)
 AGENTTRACE_OPEN = AGENTTRACE
-CONCURRENCY = [1, 2, 4, 8, 16, 32]
 
 
 def base(name: str, wl: dict, **kw) -> RunConfig:
@@ -40,18 +34,6 @@ def base(name: str, wl: dict, **kw) -> RunConfig:
 
 def grid() -> dict:
     g = {
-        "concurrency_syn": [base(f"syn_N{n}", SYN, concurrency=n) for n in CONCURRENCY],
-        "budget_syn": [base(f"syn_N16_ctx{c}", SYN, concurrency=16, ctx=c) for c in (8192, 32768)],
-        "idle_syn": [base(f"syn_N8_delay{d:g}", SYN, concurrency=8, delay_scale=d) for d in (0.0, 4.0)],
-        "retention_syn": [base("syn_N8_noram", SYN, concurrency=8, cache_ram=0),
-                          base("syn_N8_noreuse", SYN, concurrency=8, cache_prompt=False)],
-        "concurrency_ai": [base(f"ai_N{n}", AI, concurrency=n) for n in CONCURRENCY],
-        "retention_ai": [base("ai_N8_noram", AI, concurrency=8, cache_ram=0),
-                         base("ai_N8_noreuse", AI, concurrency=8, cache_prompt=False)],
-        "scheduler": [base("syn_N8_task", SYN, concurrency=8, scheduler="task"),
-                      base("syn_N8_request", SYN, concurrency=8, scheduler="request"),
-                      base("ai_N8_task", AI, concurrency=8, scheduler="task"),
-                      base("ai_N8_request", AI, concurrency=8, scheduler="request")],
         # AgentTrace reliability points: generous KV capacity and modest load target
         # >=90% task success before the separate capacity stress grid.
         "baseline_agenttrace": [

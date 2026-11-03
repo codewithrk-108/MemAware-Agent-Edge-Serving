@@ -9,6 +9,8 @@ from threading import Thread
 
 from workloads.build_agenttrace import JsonTokenizer, TokenizeClient, convert_row, convert_source
 
+TOKENIZER_JSON = Path(__file__).resolve().parents[1] / "data/source/Qwen3-0.6B-tokenizer.json"
+
 
 def byte_tokens(text):
     return list(text.encode("utf-8"))
@@ -89,8 +91,9 @@ class ConverterTests(unittest.TestCase):
         self.assertEqual(result, [13, 17])
         self.assertEqual(bodies, [("/tokenize", {"content": "<|im_start|>system\nx", "parse_special": True})])
 
+    @unittest.skipUnless(TOKENIZER_JSON.exists(), "download the tokenizer first (see data/README.md)")
     def test_offline_qwen_tokenizer_preserves_chat_markers(self):
-        tokenizer_json = Path(__file__).resolve().parents[1] / "data/source/Qwen3-0.6B-tokenizer.json"
+        tokenizer_json = TOKENIZER_JSON
         tokenizer = JsonTokenizer(tokenizer_json)
         self.assertEqual(tokenizer.tokenize("<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n"),
                          [151644, 872, 198, 13048, 151645, 198, 151644, 77091, 198])

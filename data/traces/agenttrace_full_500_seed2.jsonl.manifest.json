@@ -1,7 +1,7 @@
 {
-  "source": "/Users/parthgujarathi/Documents/291A-Systems for LLMS/phase-1-fastllamacpp/data/traces/agenttrace_all_tool_delay_150x_max10s.jsonl",
+  "source": "data/traces/agenttrace_all_tool_delay_150x_max10s.jsonl",
   "source_sha256": "81346e727fb278983e39d4e7d4b96f08082f8ef29856523fa96c98e1a7c2ad04",
-  "dataset": "/Users/parthgujarathi/Documents/291A-Systems for LLMS/phase-1-fastllamacpp/data/traces/agenttrace_full_500_seed2.jsonl",
+  "dataset": "data/traces/agenttrace_full_500_seed2.jsonl",
   "dataset_sha256": "9131e06eb8915b466e91a608d7f135634373d59dd9ccb84578385065ab30573b",
   "selection": {
     "method": "Seeded random stratified selection, rare long strata first, then shuffled",

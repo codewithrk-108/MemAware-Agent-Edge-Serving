@@ -20,6 +20,12 @@ QUOTAS = {'6-11': {'mbpp': 8, 'nl2bash': 9},
           '1': {'mbpp': 165, 'nl2bash': 0}}
 
 
+def _rel(path):
+    """Repo-relative path for manifests (absolute only for files outside the repo)."""
+    path = Path(path).resolve()
+    return path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)
+
+
 def problem_key(row):
     """Source-model variants of the same MBPP/NL2Bash problem share this key."""
     key, separator, _ = row['task_id'].rpartition('-qwen3-')
@@ -112,8 +118,8 @@ def build(source, output, seed=2, overwrite=False):
     source_manifest = source.with_name(source.name + '.manifest.json')
     transform = json.loads(source_manifest.read_text()).get('tool_delay_transform') if source_manifest.exists() else None
     manifest = {
-        'source': str(source), 'source_sha256': hashlib.sha256(source_bytes).hexdigest(),
-        'dataset': str(output), 'dataset_sha256': hashlib.sha256(encoded).hexdigest(),
+        'source': _rel(source), 'source_sha256': hashlib.sha256(source_bytes).hexdigest(),
+        'dataset': _rel(output), 'dataset_sha256': hashlib.sha256(encoded).hexdigest(),
         'selection': {'method': 'Seeded random stratified selection, rare long strata first, then shuffled',
                       'seed': seed, 'numpy_version': np.__version__, 'quotas': QUOTAS,
                       'unique_original_problems': True,

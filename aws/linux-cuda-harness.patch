@@ -1,0 +1,77 @@
+diff -ru a/harness/memory.py b/harness/memory.py
+--- a/harness/memory.py	2026-10-28 21:21:11.770404824 -0700
++++ b/harness/memory.py	2026-10-28 21:21:11.771876883 -0700
+@@ -1,4 +1,4 @@
+-"""Per-process memory measurement on macOS.
++"""Per-process memory measurement on macOS (and Linux + NVIDIA, see below).
+ 
+ `phys_footprint` is what Activity Monitor reports as "Memory" and what the kernel uses for memory-pressure
+ accounting. Unlike RSS it includes Metal (GPU) allocations in unified memory and excludes clean file-backed pages.
+@@ -36,6 +36,24 @@
+ 
+ _libproc = ctypes.CDLL("/usr/lib/libproc.dylib") if sys.platform == "darwin" else None
+ 
++# Linux + CUDA: the KV cache and weights live in VRAM, which RSS does not see. Footprint = RSS + VRAM used by
++# the process (NVML), the closest equivalent of macOS phys_footprint on unified memory.
++try:
++    import pynvml
++    pynvml.nvmlInit()
++    _nvml = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(pynvml.nvmlDeviceGetCount())]
++except Exception:
++    _nvml = None
++
++
++def _gpu_bytes(pid: int) -> int:
++    total = 0
++    for h in _nvml or []:
++        for p in pynvml.nvmlDeviceGetComputeRunningProcesses(h):
++            if p.pid == pid and p.usedGpuMemory:
++                total += p.usedGpuMemory
++    return total
++
+ MiB = 1024 * 1024
+ 
+ 
+@@ -45,12 +63,14 @@
+     footprint: int         # bytes
+     peak_footprint: int    # bytes, kernel-tracked lifetime max
+     rss: int               # bytes
++    gpu: int = 0           # bytes of VRAM (Linux + NVIDIA only)
+ 
+ 
+ def sample(pid: int) -> MemSample:
+     rss = psutil.Process(pid).memory_info().rss
+     if _libproc is None:
+-        return MemSample(time.monotonic(), rss, rss, rss)
++        gpu = _gpu_bytes(pid)
++        return MemSample(time.monotonic(), rss + gpu, rss + gpu, rss, gpu)
+     info = _RusageInfoV4()
+     if _libproc.proc_pid_rusage(pid, _RUSAGE_INFO_V4, ctypes.byref(info)) != 0:
+         raise OSError(f"proc_pid_rusage failed for pid {pid}")
+diff -ru a/harness/results.py b/harness/results.py
+--- a/harness/results.py	2026-10-28 21:21:11.771103432 -0700
++++ b/harness/results.py	2026-10-28 21:21:11.772338845 -0700
+@@ -37,6 +37,7 @@
+     return {
+         "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+         "machine": _cmd("sysctl", "-n", "machdep.cpu.brand_string") or platform.processor(),
++        "gpu": _cmd("nvidia-smi", "--query-gpu=name,driver_version,clocks.max.sm", "--format=csv,noheader"),
+         "power": power_source(),
+         "memory_gib": round(psutil.virtual_memory().total / 2**30, 1),
+         "os": f"{platform.system()} {platform.mac_ver()[0] or platform.release()}",
+diff -ru a/harness/server.py b/harness/server.py
+--- a/harness/server.py	2026-10-28 21:21:11.771521655 -0700
++++ b/harness/server.py	2026-10-28 21:21:11.772710388 -0700
+@@ -53,10 +53,10 @@
+ 
+ # lines of the -v startup log that give the static memory breakdown
+ _BREAKDOWN = {
+-    "model_gpu_mib":   re.compile(r"MTL0(?:_Mapped)? model buffer size =\s+([\d.]+) MiB"),
++    "model_gpu_mib":   re.compile(r"(?:MTL0|CUDA0)(?:_Mapped)? model buffer size =\s+([\d.]+) MiB"),
+     "model_cpu_mib":   re.compile(r"CPU(?:_Mapped)? model buffer size =\s+([\d.]+) MiB"),
+     "kv_mib":          re.compile(r"llama_kv_cache: size =\s+([\d.]+) MiB"),
+-    "compute_gpu_mib": re.compile(r"MTL0 compute buffer size =\s+([\d.]+) MiB"),
++    "compute_gpu_mib": re.compile(r"(?:MTL0|CUDA0) compute buffer size =\s+([\d.]+) MiB"),
+     "compute_cpu_mib": re.compile(r"CPU compute buffer size =\s+([\d.]+) MiB"),
+ }
+ 

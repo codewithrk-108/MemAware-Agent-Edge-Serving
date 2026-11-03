@@ -1,6 +1,6 @@
 started_utc=2026-10-31T03:27:38Z
 part=a
-ip-172-31-3-22.us-west-2.compute.internal
+<t4-host-a>
 0d472180d4439bc94737b04be926d387049f0489
 9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031  /home/ec2-user/Qwen3-0.6B-Q8_0.gguf
 286ddc0b5becb98eb1cb4503ebeeac78860c1a698dad2bad5ae9d2a2d414db7c  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/llama-server
