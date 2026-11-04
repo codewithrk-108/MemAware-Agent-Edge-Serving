@@ -27,7 +27,7 @@
 \maketitle
 
 \section{Project Description and Setup}
-Our objective is to determine whether a scheduler that anticipates memory demand and agents returning from tool calls can beat FIFO on throughput and task latency under a fixed memory budget. In Phase~1, we implemented FIFO with fixed concurrency $N$, measured it across several configurations to select a baseline, and collected preliminary memory, runtime, tool-wait, and recomputation measurements to inform Phase~2.
+Our objective is to determine whether a scheduler that anticipates memory demand and agents returning from tool calls can beat FIFO on throughput and task latency under a fixed memory budget. In Phase~1, we implemented FIFO with fixed concurrency $N$, for a single run, measured it across several configurations to select a baseline, and collected preliminary memory, runtime, tool-wait, and recomputation measurements to inform Phase~2.
 
 \textbf{System.} The GPU platform used for baseline runs was NVIDIA T4 GPU on AWS EC2 instance.
 We hosted a \texttt{llama-server} to serve Qwen3-0.6B Q8\_0 with \texttt{f16} KV in a \emph{unified} KV pool (\texttt{-kvu}, \texttt{-np}$=N$), where prompt caching was kept on while host cache was turned off. For our model, one token costs 112\,KiB of KV cache, so our \textit{fixed} 32K token KV pool reserves 3.5\,GiB at startup. These configurations were determined after running a series of smoke tests, as described later.
