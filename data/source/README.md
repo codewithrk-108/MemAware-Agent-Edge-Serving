@@ -16,30 +16,15 @@ The combined file contains 1,257 retained runs from 1,400 source rows: 652 from 
 
 `workloads/build_agenttrace.py` converts this file to the token-ID format used by `phase1/runner.py`. Its shared system prompt is in `workloads/prompts/agenttrace_smolagents_1_24_0.txt`, with provenance in the adjacent JSON file. It is a deterministic reconstruction of the `smolagents` 1.24.0 tool-calling prompt: the source trace recorded the user task and input-token counts, but not the exact rendered system message. The converter accepts either the served model's `/tokenize` endpoint or the pinned Qwen3-0.6B `tokenizer.json` in this directory. It adds the system instructions before the first user task and tokenizes each later fixed tool result as the next step's input. The runner appends its own generated tokens between steps. No source tool command is executed.
 
-The included `Qwen3-0.6B-tokenizer.json` came from [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main/tokenizer.json); its SHA-256 is `aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4`. The checked-in `agenttrace_dev.jsonl` and `agenttrace_eval.jsonl` under `data/traces/` were built from it at a 16,384-token context limit. Conversion retained 932 development and 237 evaluation runs, excluding 69 and 19 runs respectively for context length. Their manifests record the source, prompt, tokenizer, and output hashes. Verify a sample against the actual GGUF server's `/tokenize` endpoint before inference experiments.
+The tokenizer is not committed: `workloads/rebuild_workloads.sh` downloads `Qwen3-0.6B-tokenizer.json` into this directory from [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main/tokenizer.json) and checks its SHA-256 (`aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4`). The Phase 1 traces were converted with `--split all --max-context 16384`, which keeps 1,169 of the 1,257 runs (88 exceed the context limit). The resulting traces, how they were derived, and their statistics are described in [`data/README.md`](../README.md). Verify a sample against the served GGUF's `/tokenize` endpoint before inference experiments.
 
-To regenerate them offline:
+To convert offline (as the rebuild script does):
 
 ```bash
 python -m workloads.build_agenttrace --source data/source/agenttrace_readable.jsonl \
   --system-prompt workloads/prompts/agenttrace_smolagents_1_24_0.txt \
   --tokenizer-json data/source/Qwen3-0.6B-tokenizer.json \
-  --out data/traces/agenttrace_dev.jsonl --split dev --max-context 16384
-python -m workloads.build_agenttrace --source data/source/agenttrace_readable.jsonl \
-  --system-prompt workloads/prompts/agenttrace_smolagents_1_24_0.txt \
-  --tokenizer-json data/source/Qwen3-0.6B-tokenizer.json \
-  --out data/traces/agenttrace_eval.jsonl --split eval --max-context 16384
+  --out data/traces/agenttrace_all.jsonl --split all --max-context 16384
 ```
 
-If a llama-server with the target model is already running:
-
-```bash
-python -m workloads.build_agenttrace --url http://127.0.0.1:8080 \
-  --source data/source/agenttrace_readable.jsonl \
-  --out data/traces/agenttrace_dev.jsonl --split dev --max-context 16384
-python -m workloads.build_agenttrace --url http://127.0.0.1:8080 \
-  --source data/source/agenttrace_readable.jsonl \
-  --out data/traces/agenttrace_eval.jsonl --split eval --max-context 16384
-```
-
-Without `--url`, the script starts the configured `llama-server` and model (see `LLAMA_SERVER` and `MODEL` in `harness/server.py`). It writes a manifest beside each output with the source and prompt hashes, chosen filters, and exclusion counts. Record and pin the served GGUF separately; an external `--url` does not reveal its model artifact to this script. Rows whose full tokenized context plus fixed output budgets exceed `--max-context` are excluded rather than shortened. These generated traces are the files to pass to `phase1.runner --trace`. Use the same converted files for FIFO and later schedulers. Check the resulting context and output-length distributions before running a large CPU experiment; the 1.7B source runs can have very long recorded generations.
+If a llama-server with the target model is already running, pass `--url http://127.0.0.1:8080` instead of `--tokenizer-json`. Without either, the script starts the configured `llama-server` and model (see `LLAMA_SERVER` and `MODEL` in `harness/server.py`). It writes a manifest beside each output with the source and prompt hashes, chosen filters, and exclusion counts. Rows whose full tokenized context plus fixed output budgets exceed `--max-context` are excluded rather than shortened. `--split dev` or `--split eval` selects one side of the hash split recorded in each row; Phase 2 will draw its held-out evaluation set this way.

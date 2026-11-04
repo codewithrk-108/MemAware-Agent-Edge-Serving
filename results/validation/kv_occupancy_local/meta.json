@@ -96,6 +96,6 @@
     "gpu_sampling_interval_s": 1.0,
     "gpu_sampling_error": "FileNotFoundError: [Errno 2] No such file or directory: 'nvidia-smi'"
   },
-  "server_args": "/private/tmp/kv-telemetry-runtime/build/bin/llama-server -m /Users/parthgujarathi/Documents/291A-Systems for LLMS/models/Qwen3-0.6B-Q8_0.gguf -c 512 -np 1 --port 8092 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none --no-warmup -t 4 -tb 4",
+  "server_args": "/private/tmp/kv-telemetry-runtime/build/bin/llama-server -m <workspace>/models/Qwen3-0.6B-Q8_0.gguf -c 512 -np 1 --port 8092 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none --no-warmup -t 4 -tb 4",
   "doc": "Phase 1 baseline: FIFO queue with fixed concurrency in front of llama-server.\n\nTasks arrive open-loop (Poisson) and wait in one FIFO queue. The default request scheduler runs one model step per\ndequeue and releases its worker while the tool runs outside the FIFO. When the tool finishes, its response is\nappended and the next step joins the FIFO tail as runnable work. The optional task scheduler has N workers run\nwhole tasks, holding workers through tool waits.\nllama-server gets N slots, so the Python scheduler decides admission.\n\nA task that has not finished `deadline_s` after its arrival is abandoned (timeout), whether queued or running.\n"
 }

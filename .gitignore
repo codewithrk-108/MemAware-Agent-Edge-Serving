@@ -8,3 +8,26 @@ wheels/
 
 # Virtual environments
 .venv
+
+# OS / editor
+.DS_Store
+
+# Models and downloaded artifacts (see data/README.md)
+*.gguf
+models/
+data/source/Qwen3-0.6B-tokenizer.json
+data/traces/agenttrace_all.jsonl*
+
+# Secrets
+.env
+
+# Generated outputs
+results/reproduced/
+results/**/*.log
+!results/t4_load_v1_part_*/runtime_validation.log
+report/*.aux
+report/*.log
+report/*.out
+report/*.fls
+report/*.fdb_latexmk
+*.bundle

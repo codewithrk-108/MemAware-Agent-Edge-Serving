@@ -1,9 +1,0 @@
-Starting T4 smoke sweep at 2026-10-30T19:02:56Z.
-        smoke_t4 t4_smoke_8_burst_ctx32k_n8_seed2 run
-[t4_smoke_8_burst_ctx32k_n8_seed2] ok 8/8 failed 0 timeouts 0+0 | completion p50 65.5s p95 215.7s | queue p95 0.0s | 1.7 tasks/min | hit 0.75 | peak 956 MiB
-        smoke_t4 t4_smoke_8_burst_ctx64k_n8_seed2 run
-[t4_smoke_8_burst_ctx64k_n8_seed2] ok 8/8 failed 0 timeouts 0+0 | completion p50 54.2s p95 214.6s | queue p95 0.0s | 1.7 tasks/min | hit 0.68 | peak 762 MiB
-        smoke_t4 t4_smoke_20_burst_ctx64k_n16_seed2 run
-[t4_smoke_20_burst_ctx64k_n16_seed2] ok 20/20 failed 0 timeouts 0+0 | completion p50 77.9s p95 224.5s | queue p95 15.9s | 3.3 tasks/min | hit 0.65 | peak 797 MiB
-wrote /home/ec2-user/phase-1-fastllamacpp/results/phase1/summary.csv (4 runs)
-T4 smoke exited with status 0; shutting down in 60 seconds.

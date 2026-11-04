@@ -21,7 +21,7 @@
     "extra": [],
     "port": 8090,
     "verbose": false,
-    "args": "/Users/rohankumar/Desktop/RohanCode/llama.cpp/build/bin/llama-server -m /Users/rohankumar/Desktop/RohanCode/models/Llama-3.2-1B-Instruct-Q8_0.gguf -c 71680 -np 32 --port 8090 --metrics -ngl 999 -kvu"
+    "args": "<workspace>/llama.cpp/build/bin/llama-server -m <workspace>/models/Llama-3.2-1B-Instruct-Q8_0.gguf -c 71680 -np 32 --port 8090 --metrics -ngl 999 -kvu"
   },
   "n_predict": 128
 }

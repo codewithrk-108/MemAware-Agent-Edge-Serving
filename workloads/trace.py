@@ -1,8 +1,8 @@
-"""Trace format shared by the synthetic and dataset workloads.
+"""Trace format for replayed agent workloads (see data/README.md).
 
 A trace is a JSONL file, one agent task per line:
 
-    {"task_id": "react-0007", "cls": "react_agent", "source": "synthetic",
+    {"task_id": "agenttrace-mbpp-139-qwen3-0.6b", "cls": "mbpp", "source": "agenttrace",
      "steps": [{"input": [token ids appended to the history before this step],
                 "n_gen": tokens the model generates in this step,
                 "tool_delay_s": seconds the tool takes after this step, null for the last step}, ...]}

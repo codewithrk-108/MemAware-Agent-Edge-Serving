@@ -1,0 +1,35 @@
+started_utc=2026-11-01T04:31:54Z
+part=a
+<t4-host-a>
+00c231956e17422b3d5aecece57a83b70260dba5
+9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031  /home/ec2-user/Qwen3-0.6B-Q8_0.gguf
+286ddc0b5becb98eb1cb4503ebeeac78860c1a698dad2bad5ae9d2a2d414db7c  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/llama-server
+9131e06eb8915b466e91a608d7f135634373d59dd9ccb84578385065ab30573b  data/traces/agenttrace_full_500_seed2.jsonl
+438871dbdb3d038afce835b9741ba99f3e1ea2e8235d67fb9429ef7d5d3efc6e  runtime/llama-b11780-kv-occupancy.patch
+3525b1041ee5abb6d98eb78ece1da7db345617120e3f6e796207d3233cb38b31  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-base.so
+3525b1041ee5abb6d98eb78ece1da7db345617120e3f6e796207d3233cb38b31  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-base.so.0
+3525b1041ee5abb6d98eb78ece1da7db345617120e3f6e796207d3233cb38b31  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-base.so.0.27.0
+6d7206ef6a10d0a08faba4520ebbffb72d77f4897a5c0c92230fa5befed698ac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cpu.so
+6d7206ef6a10d0a08faba4520ebbffb72d77f4897a5c0c92230fa5befed698ac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cpu.so.0
+6d7206ef6a10d0a08faba4520ebbffb72d77f4897a5c0c92230fa5befed698ac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cpu.so.0.27.0
+e6d2bd4f6f10b10f01cdbfb51d818bb92465e562dc46b172bcc061596b947243  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cuda.so
+e6d2bd4f6f10b10f01cdbfb51d818bb92465e562dc46b172bcc061596b947243  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cuda.so.0
+e6d2bd4f6f10b10f01cdbfb51d818bb92465e562dc46b172bcc061596b947243  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml-cuda.so.0.27.0
+c7c496d25a210f4c02a9b1693665a1d2cd68522b5364027d04bacf692f0f424d  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml.so
+c7c496d25a210f4c02a9b1693665a1d2cd68522b5364027d04bacf692f0f424d  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml.so.0
+c7c496d25a210f4c02a9b1693665a1d2cd68522b5364027d04bacf692f0f424d  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libggml.so.0.27.0
+1a773d1ebecbabfd0c75d86d3fe3c0e4ceb8f42b4a4f82e56327a5c34795fd7a  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama-common.so
+1a773d1ebecbabfd0c75d86d3fe3c0e4ceb8f42b4a4f82e56327a5c34795fd7a  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama-common.so.0
+1a773d1ebecbabfd0c75d86d3fe3c0e4ceb8f42b4a4f82e56327a5c34795fd7a  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama-common.so.0.7.0
+0c55fc99056f1afb1424eefe14cc360bfe616c8bddb2edac256d601a0a3d54b7  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama-server-impl.so
+492f34d6a000a4bc8e025b2e71122cea8ad84b94955f27a5712912a8458d44f8  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama.so
+492f34d6a000a4bc8e025b2e71122cea8ad84b94955f27a5712912a8458d44f8  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama.so.0
+492f34d6a000a4bc8e025b2e71122cea8ad84b94955f27a5712912a8458d44f8  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libllama.so.0.7.0
+b2fb669720567ef02fd3eb21d85e4cf140ce0417ed0aa79cba4ebd09e026fcac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libmtmd.so
+b2fb669720567ef02fd3eb21d85e4cf140ce0417ed0aa79cba4ebd09e026fcac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libmtmd.so.0
+b2fb669720567ef02fd3eb21d85e4cf140ce0417ed0aa79cba4ebd09e026fcac  /home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/libmtmd.so.0.7.0
+Python 3.12.14
+name, uuid, driver_version, memory.total [MiB]
+Tesla T4, GPU-4666d253-b269-434e-4574-f4c60cdc36d5, 595.112.07, 15360 MiB
+version: 0.7.0-dev (build 1, commit 1242be6)
+built with GNU 11.5.0 for Linux x86_64

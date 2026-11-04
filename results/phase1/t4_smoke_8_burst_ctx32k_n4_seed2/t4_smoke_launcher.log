@@ -1,1 +1,0 @@
-[t4_smoke_8_burst_ctx32k_n4_seed2] ok 8/8 failed 0 timeouts 0+0 | completion p50 81.6s p95 187.6s | queue p95 57.5s | 2.0 tasks/min | hit 0.58 | peak 949 MiB
