@@ -5,3 +5,4 @@ rep,part,run,start_utc,end_utc,status,ok,failed,throughput_tasks_min,completion_
 3,b,t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2,2026-11-15T08:58:27Z,2026-11-15T10:54:51Z,ok,484,16,4.1591,5909.9,
 3,b,t4_full500_v1_c6_n4_burst_ctx32k_seed2,2026-11-15T10:54:55Z,2026-11-15T12:46:28Z,ok,476,24,4.2686,6097.1,
 3,b,t4_full500_v1_c7_n16_poisson2s_ctx64k_seed2,2026-11-15T12:46:32Z,2026-11-15T14:02:28Z,ok,340,160,4.4791,3631.1,
+3,b,t4_full500_v1_c5_n16_poisson2s_ctx32k_seed2,2026-11-15T14:02:32Z,2026-11-15T14:20:52Z,ok,100,400,5.4661,277.0,
