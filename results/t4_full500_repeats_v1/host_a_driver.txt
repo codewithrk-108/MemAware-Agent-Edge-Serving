@@ -18,3 +18,6 @@
 2026-11-15T14:02:31Z pushed results/t4-full500-repeats-v1-host-a
 2026-11-15T14:02:32Z start t4_full500_repeats_v1/rep03_part_b/t4_full500_v1_c5_n16_poisson2s_ctx32k_seed2
 [t4_full500_v1_c5_n16_poisson2s_ctx32k_seed2] ok 100/500 failed 400 timeouts 0+0 | completion p50 123.9s p95 277.0s | queue p95 116.9s | 5.5 tasks/min | hit 0.17 | peak 743 MiB
+2026-11-15T14:20:54Z pushed results/t4-full500-repeats-v1-host-a
+2026-11-15T14:20:55Z start t4_full500_repeats_v1/rep04_part_a/t4_full500_v1_c1_n1_poisson10s_ctx32k_seed2
+[t4_full500_v1_c1_n1_poisson10s_ctx32k_seed2] ok 500/500 failed 0 timeouts 0+0 | completion p50 4112.2s p95 7394.9s | queue p95 3380.3s | 2.7 tasks/min | hit 0.38 | peak 705 MiB
