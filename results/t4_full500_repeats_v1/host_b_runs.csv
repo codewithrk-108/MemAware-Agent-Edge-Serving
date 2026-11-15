@@ -1,0 +1,2 @@
+rep,part,run,start_utc,end_utc,status,ok,failed,throughput_tasks_min,completion_p95_s,detail
+2,b,t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2,2026-11-15T03:20:26Z,2026-11-15T05:15:38Z,ok,476,24,4.1343,5684.9,

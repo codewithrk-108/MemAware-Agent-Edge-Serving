@@ -1,0 +1,2 @@
+2026-11-15T03:20:26Z start t4_full500_repeats_v1/rep02_part_b/t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2
+[t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2] ok 476/500 failed 24 timeouts 0+0 | completion p50 4111.5s p95 5684.9s | queue p95 3015.9s | 4.1 tasks/min | hit 0.44 | peak 721 MiB
