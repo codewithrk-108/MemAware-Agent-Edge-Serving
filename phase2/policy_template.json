@@ -1,0 +1,10 @@
+{
+  "aging_threshold_s": 30.0,
+  "backfill_guard_s": 1.0,
+  "estimated_tool_delay_s": 0.2,
+  "kv_safety_margin_cells": 512,
+  "max_tool_reserve_cells": 4096,
+  "reserve_horizon_s": 5.0,
+  "reserve_per_waiting_task": 256,
+  "timing_mode": "estimated"
+}

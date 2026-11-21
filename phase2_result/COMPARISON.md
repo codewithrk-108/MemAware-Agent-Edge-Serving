@@ -1,61 +1,61 @@
-# Phase 2 matched T4 smoke result
+# Phase 2 matched T4 smoke results
 
 ## Outcome
 
-The current Phase 2 policy did **not** improve the matched Phase 1 FIFO result. Both policies completed 46 of 50 tasks and failed four tasks with KV-context errors. Phase 2 retained 97.7% of FIFO throughput, satisfying the smoke's 90% throughput floor, but it did not satisfy the primary requirement of reducing failures or completion loss.
+The 500 ms adaptive-concurrency policy completed 50/50 tasks with no KV-context failures. Relative to zero-grace slot-aware Phase 2, it reduced recomputed prompt tokens by 83.8%, increased cache hit rate from 26.5% to 71.6%, and recovered throughput from 3.089 to 3.359 tasks/min. Throughput is within 0.15% of Phase 1 FIFO while completing four additional tasks.
 
-This is a useful negative result: logical reservations for active requests do not account for retained idle KV contents in llama.cpp. Both policies still filled the physical KV pool, and Phase 2 dispatched no backfills. The next development step should be slot-aware retained-cache accounting and validated cache eviction/recomputation, not parameter tuning of the current policy alone.
+The result does not improve every latency metric. Resume priority preserved 40 short-wait caches but allowed returning multi-step tasks to bypass older first-step work. Completion p95 improved 1.48% relative to zero-grace, while completion p50 increased 42.7% and ready-queue p95 increased 15.0%. Adaptive grace solves most recomputation overhead but introduces substantial inter-task unfairness.
 
 ## Matched results
 
-| Metric | Phase 1 FIFO | Phase 2 two-queue | Phase 2 change |
-|---|---:|---:|---:|
-| Completed tasks | 46/50 | 46/50 | no change |
-| KV-context failures | 4 | 4 | no change |
-| Completed tasks/min | 3.364 | 3.286 | -2.31% |
-| Completion p50 | 390.8 s | 389.4 s | -0.37% |
-| Completion p95 | 692.0 s | 727.2 s | +5.08% |
-| Ready-queue p95 | 552.6 s | 589.0 s | +6.60% |
-| Run span | 820.5 s | 839.9 s | +2.37% |
-| Mean physical KV occupancy | 56.85% | 57.57% | +1.27% relative |
-| Peak physical KV occupancy | 99.994% | 99.982% | effectively unchanged |
-| Cache-hit ratio | 57.05% | 60.83% | +6.63% relative |
-| Prefill tokens computed | 131,377 | 135,209 | +2.92% |
+| Metric | Phase 1 FIFO | Phase 2 logical | Slot-aware, 0 ms | Adaptive, 500 ms | Adaptive vs 0 ms |
+|---|---:|---:|---:|---:|---:|
+| Completed tasks | 46/50 | 46/50 | 50/50 | **50/50** | same |
+| KV-context failures | 4 | 4 | 0 | **0** | same |
+| Completed tasks/min | 3.364 | 3.286 | 3.089 | **3.359** | +8.73% |
+| Completion p50 | 390.8 s | 389.4 s | 438.4 s | 625.5 s | +42.67% |
+| Completion p95 | 692.0 s | 727.2 s | 838.5 s | **826.1 s** | -1.48% |
+| Ready-queue p95 | 552.6 s | 589.0 s | 668.6 s | 768.7 s | +14.96% |
+| Run span | 820.5 s | 839.9 s | 971.1 s | **893.1 s** | -8.03% |
+| Mean ready queue | 21.67 | — | 19.96 | 26.06 | +30.55% |
+| Mean active requests | 3.536 | — | 3.360 | **3.749** | +11.57% |
+| Mean physical KV use | 57.04% | — | 50.49% | 54.53% | +7.99% |
+| Peak physical KV use | 99.99% | 99.98% | **88.98%** | 93.48% | +5.05% |
+| Cache-hit ratio | 57.05% | 60.83% | 26.50% | **71.60%** | +170.23% |
+| Prefill tokens computed | 131,377 | 135,209 | 284,603 | **109,848** | -61.40% |
+| Cache evictions | — | — | 102 | **66** | -35.29% |
+| Recomputed requests | — | — | 52 | **16** | -69.23% |
+| Recomputed prompt tokens | — | — | 226,908 | **36,719** | -83.82% |
 
-Phase 2 made 111 FIFO-head admissions, zero backfill admissions, and recorded 20 aged-head blocked decisions. Total measured scheduler decision overhead was 4.6 ms across 131 decisions, with a maximum individual decision cost of 0.068 ms; Python scheduler overhead is therefore not the cause of the performance difference.
+Phase 1 latency is survivor-biased because four tasks failed. On the same 46 tasks that succeeded under Phase 1, adaptive completion p50/p95 were 609.3/803.5 s versus Phase 1's 390.8/692.0 s. The latency gap is therefore real, not solely caused by the four additional completions.
 
-## Validity checks
+## Adaptive behavior
 
-- Same T4 host, pinned instrumented llama.cpp b11780 binary, model, 32K unified KV pool, and `N=4`.
-- Same 50 unique AgentTrace tasks in the same seeded replay setup.
-- Same total task token budget: 240,304 tokens.
-- Same burst arrivals, prompt-reuse setting, host-cache setting, tool delays, deadlines, and request timeouts.
-- Both failures were exclusively llama.cpp context-capacity errors; neither run had timeouts.
-- The matched FIFO result reproduces the historical Phase 1 S3 point: 46/50 and approximately 3.38 tasks/min.
-
-The failed task identities differ because the two policies altered timing/order around tool returns, but the failure count and failure class are unchanged. Executed generated-token totals differ because failures occurred at different task steps; neither policy shortened successful responses.
+- Grace window: 500 ms, selected because 40/63 trace tool waits finish within 500 ms and none additional finish between 500 ms and 1 s.
+- Grace hits: 40 resumed requests reused their retained slots.
+- Grace hold decisions: 112 dispatcher observations; this is a decision count, not elapsed hold time.
+- Evictions: 16 expired-grace slot reassignments plus 50 terminal cleanups. There were no memory-pressure evictions.
+- Reliability: 50 successes, no failures, no timeouts, and no erase-verification errors.
+- Although slots were temporarily protected, less recomputation shortened service enough to raise average active concurrency from 3.36 to 3.75 requests.
 
 ## Interpretation
 
-The current fit model subtracts logical reservations for active requests, a safety margin, and a bounded tool-return reserve. It does not subtract or explicitly own retained idle slot caches. Physical measurements show why this matters: Phase 2 still reached 32,762 of 32,768 occupied cells. Once the pool is physically full, a request can fail even when the active-reservation calculation says it fits.
+The grace period addresses the dominant zero-grace bottleneck. Prefill work fell below even Phase 1 because short tool returns reused their retained KV state. This recovered throughput and shortened total run time without reintroducing KV failures.
 
-The lack of backfill is also expected at this point. At `N=4`, workers normally remain occupied; when a head became logically blocked, it had already crossed the 30-second aging threshold, so the fairness rule prevented younger work from bypassing it. Backfill is more likely to matter at a higher slot count or with a longer aging threshold, but changing those parameters cannot solve untracked idle KV occupancy.
+The remaining problem is fairness. A cache hit currently gives the returning request immediate priority on its retained slot. That is required to avoid instantly evicting the just-preserved cache, but repeated returns let multi-step tasks advance while older tasks remain queued. Median task completion and ready-queue tails therefore worsened even though per-task median service time fell from 303.1 s to 91.3 s.
 
-## Recommended next smoke
+The next policy should bound resume priority rather than remove grace. Candidate controls are a maximum consecutive resume count, disabling resume priority when the FIFO head exceeds an age threshold, or comparing saved recomputation time against added head-of-line delay. The 500 ms policy should be repeated before tuning so run-to-run variance is known.
 
-1. Add explicit task-to-llama.cpp-slot ownership.
-2. Track retained idle cache cells separately from active reservations.
-3. Validate that erasing a selected idle slot releases physical cells and that the evicted agent recomputes correctly.
-4. Repeat this exact matched smoke with eviction disabled and enabled.
-5. Only after the retained-cache path works, run `N=8` to expose genuine backfill opportunities.
+## Validity
 
-Do not freeze the current policy based on this run.
+All policies used the same T4 host, Qwen3-0.6B-Q8_0 model, pinned llama.cpp b11780 runtime, four slots, 32K unified KV pool, 50 AgentTrace tasks, burst arrival, seed 2, tool delays, output budgets, frozen runtime estimator, and host-cache setting. The adaptive run changed only the grace/resume behavior. All 113 requests generated their requested output lengths.
 
 ## Artifacts
 
-- `runs/smoke_phase1_fifo_n4_burst_50/`: raw FIFO tasks, requests, timeline, admission diagnostics, memory samples, logs, and metadata.
-- `runs/smoke_phase2_two_queue_n4_burst_50/`: raw Phase 2 tasks, requests, timeline, scheduler decisions, memory samples, logs, and metadata.
-- `summary.csv`: compact metric comparison.
-- `smoke.log`: combined remote launcher output.
-- `provenance.txt`: host, runtime/model paths, UTC timestamps, and estimator/trace checksums.
-- `SMOKE_DESIGN.md`: predeclared design and decision rule.
+- `runs/smoke_phase1_fifo_n4_burst_50/`: matched FIFO baseline.
+- `runs/smoke_phase2_two_queue_n4_burst_50/`: logical-only Phase 2.
+- `runs/smoke_phase2_slot_aware_n4_burst_50/`: zero-grace slot-aware Phase 2.
+- `runs/smoke_phase2_adaptive_n4_burst_50/`: adaptive raw results.
+- `adaptive_smoke.log`: remote launcher output.
+- `adaptive_provenance.txt`: launch configuration and checksums.
+- `summary.csv`: compact four-policy comparison.

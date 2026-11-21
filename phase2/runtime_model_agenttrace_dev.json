@@ -1,0 +1,14 @@
+{
+  "intercept_s": 0.0,
+  "prefill_s_per_token": 0.0025859380990367283,
+  "decode_s_per_token": 0.01602044661820625,
+  "fallback_s": 71.19598964350004,
+  "source_files": [
+    "results/t4_full500_v1_part_a/t4_full500_v1_c2_n4_poisson5s_ctx32k_seed2/requests.csv",
+    "results/t4_full500_v1_part_b/t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2/requests.csv",
+    "results/t4_full500_v1_part_b/t4_full500_v1_c6_n4_burst_ctx32k_seed2/requests.csv"
+  ],
+  "source_sha256": "8ea07cc9accd32e4470bb4f2002f43b5473409a7883b249ac6bd15e69f48beae",
+  "error_p50_s": 3.015609394198627,
+  "error_p95_s": 12.003011876610666
+}

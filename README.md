@@ -87,6 +87,48 @@ On macOS the harness refuses to benchmark on battery power (`--allow-battery` ov
 - **GPU instead of CPU.** Final runs use an AWS NVIDIA T4. The constraint studied is a fixed KV-cell budget in a preallocated buffer, and results do not cover OS memory pressure or swapping.
 - **One workload source.** AgentTrace only; Exgentic traces are not yet included, and tool waits are short even after scaling.
 
+## Phase 2 two-queue scheduler
+
+Phase 2 lives in the sibling `phase2/` package so the Phase 1 runner remains reproducible. It adds a central dispatcher, logical KV reservations, memory-aware FIFO, a computed bounded-backfill view, aging protection, a bounded tool-return reserve, runtime prediction, and additive scheduler-decision logs. Cache eviction is staged behind runtime slot-ownership validation and is not enabled by the core runner.
+
+Create the deterministic 250/250 AgentTrace development/evaluation split:
+
+```bash
+uv run python -m phase2.workloads
+```
+
+Fit the runtime estimator using only development task IDs from committed Phase 1 N4 requests:
+
+```bash
+uv run python -m phase2.estimator \
+  results/t4_full500_v1_part_a/t4_full500_v1_c2_n4_poisson5s_ctx32k_seed2/requests.csv \
+  results/t4_full500_v1_part_b/t4_full500_v1_c4_n4_poisson2s_ctx32k_seed2/requests.csv \
+  results/t4_full500_v1_part_b/t4_full500_v1_c6_n4_burst_ctx32k_seed2/requests.csv \
+  --split-manifest data/traces/agenttrace_phase2_split.manifest.json \
+  --out phase2/runtime_model_agenttrace_dev.json
+```
+
+Generate prediction-error diagnostics by context length, output budget, request step, and source run with `python -m phase2.calibrate`; the committed development report is `phase2/runtime_model_agenttrace_dev.metrics.json`.
+
+Validate a run configuration without starting a server:
+
+```bash
+uv run python -m phase2.runner --name phase2_dry \
+  --runtime-model phase2/runtime_model_agenttrace_dev.json \
+  --trace data/traces/agenttrace_phase2_dev.jsonl --n-tasks 250 \
+  --rate 0.2 --concurrency 4 --ctx 32768 --dry-run
+```
+
+Remove `--dry-run` and add `--require-kv-metrics` for an instrumented GPU run. Use `--timing-mode estimated` for headline experiments; `oracle` uses exact replay delays only for the explicitly labeled upper-bound comparison.
+
+Before evaluation, freeze the calibrated policy and verify its estimator/development inputs with `python -m phase2.freeze`. Validate result integrity and output-token compliance with:
+
+```bash
+uv run python -m analysis.reproduce_phase2 results/phase2/RUN_DIRECTORY
+```
+
+Run Phase 2 tests with `uv run pytest -q tests/test_phase2_*.py`; the full `uv run pytest -q` command remains the regression gate.
+
 ## Team
 
 - Aniket Singh

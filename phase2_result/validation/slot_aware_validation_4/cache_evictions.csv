@@ -1,0 +1,8 @@
+t,slot_id,task_index,task_id,reason,estimated_resident_cells,used_cells_before,used_cells_after,reclaimed_cells,verification_error
+4.159689355999944,0,0,agenttrace-nl2bash-146-qwen3-1.7b,slot_reassignment,1651,3331,1683,1648,
+10.893341527999837,0,2,agenttrace-nl2bash-130-qwen3-0.6b,slot_reassignment,1984,4569,2588,1981,
+12.211204957000064,1,1,agenttrace-mbpp-58-qwen3-0.6b,terminal_complete,2736,3968,1235,2733,
+21.35121219099983,0,3,agenttrace-nl2bash-165-qwen3-1.7b,slot_reassignment,2423,5278,2857,2421,
+21.902536961999886,1,0,agenttrace-nl2bash-146-qwen3-1.7b,terminal_complete,2880,4920,2043,2877,
+24.701099862999854,0,2,agenttrace-nl2bash-130-qwen3-0.6b,terminal_complete,2375,4934,2562,2372,
+32.74560335999968,1,3,agenttrace-nl2bash-165-qwen3-1.7b,terminal_complete,3694,3693,0,3693,
