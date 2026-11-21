@@ -67,6 +67,8 @@ Phase 1's closest 50-task T4 comparison is N=4 with exponentially distributed ar
 
 A fresh two-arm run is preferable to comparing only against the historical artifact: FIFO and unrestricted adaptive should use the same current T4 runtime, trace, sampled task order, generated arrival gaps, model, deadlines, and instrumentation. Because each arm is expected to take roughly 14--18 minutes, the paired experiment should budget 35--45 minutes including model startup, download, and analysis.
 
+The matched run confirmed the historical FIFO result (46/50, four KV failures, 3.255 tasks/min) and completed 50/50 adaptively at 3.454 tasks/min with no KV failures. Adaptive reduced prefill work by 30.7% and produced 38 actual grace hits, but completion p95 increased 22.2%. Poisson-5 seconds exposed seven FIFO diagnostic opportunities but zero eligible Phase 2 candidates: most blocked heads were already older than the aging threshold and had zero runtime allowance. The test also exposed and fixed two overlapping-return bugs: zero fairness now means truly unrestricted, and a request can be assigned only its retained slot or an unowned slot.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.

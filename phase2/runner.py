@@ -26,6 +26,10 @@ from workloads.trace import load
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _resume_priority_blocked(limit: int, streak: int, pending: int) -> bool:
+    return limit > 0 and (streak >= limit or pending >= limit)
+
+
 @dataclass
 class Phase2Config:
     run: RunConfig
@@ -231,10 +235,10 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
             state.runnable = True
             enqueue_sequence += 1
             head_age = max(0.0, now - scheduler.entries[0].ready_at) if scheduler.entries else 0.0
-            quota_blocked = bool(scheduler.entries) and (
-                pending_resume_priorities > 0
-                or (cfg.max_consecutive_resume_priorities > 0
-                    and resume_priority_streak >= cfg.max_consecutive_resume_priorities)
+            quota_blocked = bool(scheduler.entries) and _resume_priority_blocked(
+                cfg.max_consecutive_resume_priorities,
+                resume_priority_streak,
+                pending_resume_priorities,
             )
             age_blocked = (
                 bool(scheduler.entries) and cfg.resume_priority_head_age_limit_s > 0
@@ -453,7 +457,21 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                                 break
                     decision_started = time.perf_counter()
                     eligible_workers = scheduler.free_workers - protected_slots
-                    selection, decision = scheduler.select(loop.time(), eligible_workers)
+                    worker_options = None
+                    if slot_manager:
+                        unowned_workers = {
+                            worker for worker in eligible_workers
+                            if slot_manager.owner(worker) is None
+                        }
+                        worker_options = {}
+                        for entry in scheduler.entries:
+                            options = set(unowned_workers)
+                            preferred = slot_manager.preferred_slot(entry.task_index)
+                            if preferred in eligible_workers:
+                                options.add(preferred)
+                            worker_options[entry.task_index] = options
+                    selection, decision = scheduler.select(
+                        loop.time(), eligible_workers, worker_options)
                     if decision:
                         decision["scheduler_overhead_s"] = time.perf_counter() - decision_started
                         decision["t"] -= t0

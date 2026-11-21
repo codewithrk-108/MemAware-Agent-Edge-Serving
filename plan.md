@@ -600,13 +600,15 @@ The predeclared success target is 50/50 completion with zero KV failures, at lea
 
 ### Poisson smoke todos
 
-- [ ] Add uniquely named FIFO and previous-adaptive Poisson-5s smoke configurations.
-- [ ] Assert identical seeded task order and arrival offsets across both arms.
-- [ ] Keep fairness controls explicitly disabled in metadata.
-- [ ] Add a dry-run/configuration test and run the local suite.
-- [ ] Present this design and receive approval before any AWS run.
-- [ ] Deploy scoped files and run both arms on the approved T4 instance.
-- [ ] Download artifacts and compare against each other and the historical Phase 1 Poisson-5s result.
-- [ ] Commit the complete Poisson experiment with an algorithm/configuration-specific message after validation.
+- [x] Add uniquely named FIFO and previous-adaptive Poisson-5s smoke configurations.
+- [x] Assert identical seeded task order and arrival offsets across both arms.
+- [x] Keep fairness controls explicitly disabled in metadata.
+- [x] Add a dry-run/configuration test and run the local suite.
+- [x] Present this design and receive approval before any AWS run.
+- [x] Deploy scoped files and run both arms on the approved T4 instance.
+- [x] Download artifacts and compare against each other and the historical Phase 1 Poisson-5s result.
+- [x] Commit the complete Poisson experiment with an algorithm/configuration-specific message after validation.
 
 Every subsequent experiment must receive its own scoped commit containing its implementation, tests, configuration, documentation, and result artifacts. Commit messages should identify the algorithm or experiment, for example `Add unrestricted adaptive Poisson-5s experiment`.
+
+The valid adaptive arm completed 50/50 tasks with zero KV failures and exceeded FIFO completed-task throughput by 6.10%, but missed the predeclared p95 target by increasing completion p95 22.23%. Backfill candidate count remained zero. The final implementation also corrects unrestricted-limit semantics and enforces per-request slot compatibility under overlapping Poisson returns.

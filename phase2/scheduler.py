@@ -197,15 +197,17 @@ class TwoQueueScheduler:
             "backfill_allowance_s": allowance_s,
         }
 
-    def select(self, now: float, eligible_workers: Optional[set[int]] = None
+    def select(self, now: float, eligible_workers: Optional[set[int]] = None,
+               worker_options: Optional[dict[int, set[int]]] = None
                ) -> tuple[Optional[Selection], Optional[dict]]:
         workers = self.free_workers if eligible_workers is None else self.free_workers & eligible_workers
         if not self.entries or not workers:
             return None, None
         head = self.entries[0]
-        if self._fits(head, now):
+        head_workers = self._workers_for(head, workers, worker_options)
+        if self._fits(head, now) and head_workers:
             selected = self.entries.pop(0)
-            worker = self._worker_for(selected, workers)
+            worker = self._worker_for(selected, head_workers)
             decision = self._decision(now, head, selected, worker, "fifo_head")
             return self._reserve(selected, worker, now, "fifo_head", decision), decision
 
@@ -215,12 +217,14 @@ class TwoQueueScheduler:
         if allowance > 0:
             candidates = [entry for entry in self.entries[1:]
                           if self._fits(entry, now)
+                          and self._workers_for(entry, workers, worker_options)
                           and entry.predicted_runtime_s <= allowance
                           and now + entry.predicted_runtime_s < entry.deadline_at]
         if candidates:
             selected = min(candidates, key=lambda entry: (entry.ready_at, entry.enqueue_sequence))
             self.entries.remove(selected)
-            worker = self._worker_for(selected, workers)
+            worker = self._worker_for(
+                selected, self._workers_for(selected, workers, worker_options))
             head.bypass_count += 1
             decision = self._decision(now, head, selected, worker, "backfill",
                                       candidate_count=len(candidates), allowance_s=allowance)
@@ -235,6 +239,13 @@ class TwoQueueScheduler:
         if request.preferred_worker in workers:
             return request.preferred_worker
         return min(workers)
+
+    @staticmethod
+    def _workers_for(request: ReadyRequest, workers: set[int],
+                     worker_options: Optional[dict[int, set[int]]]) -> set[int]:
+        if worker_options is None:
+            return workers
+        return workers & worker_options.get(request.task_index, set())
 
     def _reserve(self, request: ReadyRequest, worker: int, now: float,
                  reason: str, decision: dict) -> Selection:

@@ -7,7 +7,7 @@ import numpy as np
 from phase1.runner import RunConfig
 from phase2.estimator import RuntimeEstimator
 from phase2.cache import EvictionResult
-from phase2.runner import Phase2Config, run_phase2
+from phase2.runner import Phase2Config, _resume_priority_blocked, run_phase2
 from phase2.scheduler import ReadyRequest, SchedulerConfig, TwoQueueScheduler
 from workloads.trace import Step, Task
 
@@ -124,6 +124,23 @@ class TwoQueueSchedulerTests(unittest.TestCase):
         selection, _ = scheduler.select(1, eligible_workers={1})
         self.assertEqual(selection.worker, 1)
 
+    def test_selection_uses_only_request_compatible_worker(self):
+        scheduler = self.scheduler(concurrency=2)
+        scheduler.put(request(0, 0, 2))
+        selection, _ = scheduler.select(
+            1, eligible_workers={0, 1}, worker_options={0: {1}})
+        self.assertEqual(selection.worker, 1)
+
+    def test_backfill_requires_a_compatible_worker(self):
+        scheduler = self.scheduler(concurrency=2)
+        scheduler.set_idle_cache(9, 8)
+        scheduler.put(request(0, 0, 5, runtime=1))
+        scheduler.put(request(1, 1, 1, runtime=1))
+        selection, decision = scheduler.select(
+            2, eligible_workers={0}, worker_options={0: set(), 1: {0}})
+        self.assertEqual(selection.request.task_index, 1)
+        self.assertEqual(decision["reason"], "backfill")
+
     def test_evicted_ready_task_loses_stale_slot_preference(self):
         scheduler = self.scheduler(concurrency=2)
         returning = request(0, 0, 2)
@@ -209,6 +226,11 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
         run.server.ctx = values.pop("ctx", 20)
         return Phase2Config(run=run, aging_threshold_s=values.pop("aging", 0.2),
                             backfill_guard_s=0, kv_safety_margin_cells=0, **values)
+
+    def test_zero_resume_limit_is_unrestricted_even_with_pending_returns(self):
+        self.assertFalse(_resume_priority_blocked(0, streak=20, pending=20))
+        self.assertTrue(_resume_priority_blocked(1, streak=0, pending=1))
+        self.assertTrue(_resume_priority_blocked(1, streak=1, pending=0))
 
     async def test_runner_preserves_fifo_when_requests_fit(self):
         tasks = [self.make_task("a", 10), self.make_task("b", 20)]

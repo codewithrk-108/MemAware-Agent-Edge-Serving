@@ -11,12 +11,12 @@ from phase2.runner import Phase2Config, execute as execute_phase2
 
 
 def run_config(name: str, trace: str, n_tasks: int, concurrency: int,
-               ctx: int, seed: int) -> RunConfig:
+               ctx: int, seed: int, arrival_rate: float = 0.0) -> RunConfig:
     return RunConfig(
         name=name,
         trace=trace,
         n_tasks=n_tasks,
-        arrival_rate=0.0,
+        arrival_rate=arrival_rate,
         concurrency=concurrency,
         delay_scale=1.0,
         cache_prompt=True,
@@ -33,7 +33,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--policy", choices=("phase1", "phase2", "phase2-slot",
                                              "phase2-adaptive", "phase2-fair-adaptive",
-                                             "both"),
+                                             "poisson5-adaptive", "poisson5-both", "both"),
                         default="both")
     parser.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
     parser.add_argument("--runtime-model", type=Path,
@@ -124,6 +124,35 @@ def main() -> None:
             resume_priority_head_age_limit_s=30,
         )
         summaries["phase2_fair_adaptive"] = execute_phase2(
+            config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
+
+    if args.policy == "poisson5-both":
+        phase1 = run_config("smoke_phase1_fifo_n4_poisson5s_50", args.trace,
+                            args.n_tasks, args.concurrency, args.ctx, args.seed,
+                            arrival_rate=0.2)
+        summaries["phase1_fifo_poisson5s"] = execute_phase1(
+            phase1, group=args.output_group)
+
+    if args.policy in {"poisson5-adaptive", "poisson5-both"}:
+        phase2_run = run_config("smoke_phase2_adaptive_n4_poisson5s_50", args.trace,
+                                args.n_tasks, args.concurrency, args.ctx, args.seed,
+                                arrival_rate=0.2)
+        config = Phase2Config(
+            run=phase2_run,
+            aging_threshold_s=30,
+            backfill_guard_s=8,
+            kv_safety_margin_cells=512,
+            reserve_per_waiting_task=256,
+            max_tool_reserve_cells=4096,
+            reserve_horizon_s=5,
+            estimated_tool_delay_s=0.2,
+            timing_mode="estimated",
+            eviction_policy="slot_aware",
+            cache_grace_s=0.5,
+            max_consecutive_resume_priorities=0,
+            resume_priority_head_age_limit_s=0,
+        )
+        summaries["phase2_adaptive_poisson5s"] = execute_phase2(
             config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
 
     print(json.dumps(summaries, indent=2, default=str))
