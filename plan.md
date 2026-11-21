@@ -561,3 +561,52 @@ Risks and tradeoffs: preserving a slot can temporarily idle compute while work i
 `uv run python -m analysis.reproduce_phase1` recomputes the Phase 1 tables and inline values but exits when it tries to import the pre-existing missing `report/fig_tradeoff.py`. The Phase 1 numerical reproduction tests pass; this unrelated report-source gap was not modified.
 
 Implementation was explicitly approved in the adaptive-concurrency request. The matched run completed 50/50 tasks with zero KV errors, 40 grace hits, 16 recomputed requests, and 3.359 tasks/min. The policy recovered throughput and KV reuse but worsened median completion and ready-queue latency because within-grace resumes bypass older queued work; bounded resume fairness is the next required refinement.
+
+## Fair adaptive-resume extension
+
+I want to build a new feature `fair adaptive resume` that extends the 500 ms slot-aware grace policy to retain most KV reuse while preventing repeated tool returns from indefinitely bypassing older FIFO work.
+
+The implementation adds two disabled-by-default controls so the completed adaptive result remains reproducible: a maximum consecutive priority-resume count and a FIFO-head age cutoff. The matched smoke configuration permits one priority resume, then requires one normal FIFO admission before another priority resume; it also denies priority when the oldest queued request has waited at least 30 seconds. A return denied priority joins the normal FIFO queue. Its retained cache may still be reused if its slot remains available, or safely erased by the existing slot-aware path if older work needs the slot.
+
+The runner will distinguish returning within grace from actually reusing the cache, record priority grants and denial reasons, and expose all controls in metadata and CLI configuration. The experiment changes only resume fairness relative to the previous 500 ms adaptive run.
+
+### Fair adaptive-resume todos
+
+- [x] Add disabled-by-default consecutive-resume and head-age controls with validation.
+- [x] Mark priority-resume requests explicitly and update quota state only at admission.
+- [x] Preserve FIFO ordering for denied returns and distinguish grace returns from actual cache hits.
+- [x] Record priority grants, quota denials, age denials, cache reuse, and configuration.
+- [x] Add focused quota, age-cutoff, compatibility, and artifact tests.
+- [x] Run the complete local test suite (`95 passed, 1 skipped`).
+- [x] Deploy only the scoped runtime files to the isolated T4 workspace.
+- [x] Run the matched 50-task fair-adaptive smoke test.
+- [x] Download raw artifacts and compare with FIFO, zero-grace, and unrestricted adaptive runs.
+
+The user explicitly approved implementation and the matched smoke test on 2026-11-21.
+
+The run completed 50/50 tasks with no KV errors. Fairness improved substantially versus unrestricted adaptive, but the 30-second old-head cutoff denied 32 returns while the one-for-one quota denied none. Cache hits fell from 40 to 8, throughput from 3.359 to 3.095 tasks/min, and recomputation rose from 36,719 to 224,734 tokens. The cutoff should be disabled or relaxed in the next development ablation so the quota can be evaluated independently.
+
+## Previous-adaptive Poisson smoke design
+
+I want to build a new experiment `matched Poisson-5s FIFO versus unrestricted adaptive` that extends the Phase 2 evaluation to the Phase 1 open-loop arrival regime and determines whether staggered arrivals create real backfill opportunities while preserving adaptive KV reuse.
+
+The previous adaptive algorithm remains available as `phase2-adaptive`; no destructive source revert is needed. The experiment will explicitly set `cache_grace_s=0.5`, `max_consecutive_resume_priorities=0`, and `resume_priority_head_age_limit_s=0`. A new named Poisson smoke configuration will avoid overwriting any burst artifact.
+
+Both arms will use 50 AgentTrace tasks, seed 2, N=4, a 32K unified KV pool, mean interarrival 5 seconds (`arrival_rate=0.2`), request-level scheduling, prompt reuse on, host cache off, identical tool delays, 14,400-second task deadlines, 900-second request timeouts, the frozen estimated-time model, and the pinned T4 llama.cpp runtime. Seeded sampling and exponential gaps must match across arms.
+
+Primary metrics are completion count, KV failures, completed-task throughput, completion p50/p95, ready-queue p50/p95, and run span. Mechanism metrics are backfill opportunities/admissions, blocked-head decisions, grace returns/hits, evictions, recomputed requests/tokens, cache-hit ratio, mean/peak KV use, mean queue length, and mean concurrency.
+
+The predeclared success target is 50/50 completion with zero KV failures, at least 95% of matched FIFO completed-task throughput, and no more than 10% worse p95 completion latency. Backfill is observational in this smoke: zero admissions does not fail the adaptive policy, but the run must report why candidate windows were absent. Expected paired wall time is 35--45 minutes.
+
+### Poisson smoke todos
+
+- [ ] Add uniquely named FIFO and previous-adaptive Poisson-5s smoke configurations.
+- [ ] Assert identical seeded task order and arrival offsets across both arms.
+- [ ] Keep fairness controls explicitly disabled in metadata.
+- [ ] Add a dry-run/configuration test and run the local suite.
+- [ ] Present this design and receive approval before any AWS run.
+- [ ] Deploy scoped files and run both arms on the approved T4 instance.
+- [ ] Download artifacts and compare against each other and the historical Phase 1 Poisson-5s result.
+- [ ] Commit the complete Poisson experiment with an algorithm/configuration-specific message after validation.
+
+Every subsequent experiment must receive its own scoped commit containing its implementation, tests, configuration, documentation, and result artifacts. Commit messages should identify the algorithm or experiment, for example `Add unrestricted adaptive Poisson-5s experiment`.

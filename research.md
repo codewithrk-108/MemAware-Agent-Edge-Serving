@@ -53,6 +53,20 @@ The first slot-aware smoke run completed all 50 tasks but evicted 102 caches and
 
 The existing central dispatcher can implement this without changing llama.cpp: temporarily exclude grace-protected idle slots from eligible workers. The number of active requests then adapts between zero and four while protected owners wait. A returning owner can immediately reuse its slot; after the deadline the slot becomes eligible for the existing verified erase/reassignment path. Required additions are a configuration field, per-task grace deadlines, eligible-worker selection, an exact wakeup at grace expiry, result instrumentation, and focused scheduler/runner tests.
 
+### Fairness follow-up
+
+The 500 ms run recovered throughput to 3.359 tasks/min and reduced recomputation to 36,719 tokens, but completion p50 rose to 625.5 seconds and ready-queue p95 to 768.7 seconds. Median service time fell to 91.3 seconds, showing that the remaining regression is queue allocation rather than model execution. The immediate resume insertion lets multi-step tasks repeatedly move ahead of the original burst queue.
+
+The smallest targeted correction is a weighted resume quota plus an old-head cutoff. One priority resume must be followed by one ordinary FIFO admission, and a FIFO head aged 30 seconds or more blocks priority. These controls should be separate from the cache grace itself: denied requests retain normal slot-aware semantics and can still obtain a cache hit when capacity permits. The experiment must measure actual cache reuse rather than merely returning before the grace deadline because a denied return can subsequently be evicted.
+
+### Poisson follow-up
+
+The fair-adaptive run showed that the 30-second cutoff removes nearly all adaptive-cache benefit on a burst workload. The next experiment returns to the previous unrestricted adaptive configuration (`cache_grace_s=0.5`, both fairness controls zero) without deleting the fair-policy implementation or results.
+
+Phase 1's closest 50-task T4 comparison is N=4 with exponentially distributed arrivals at rate 0.2 tasks/s (mean interarrival 5 seconds), 32K KV cells, request-level scheduling, seed 2, host cache disabled, and prompt reuse enabled. Its historical FIFO run completed 46/50 tasks at 3.256 tasks/min and reported seven diagnostic backfill opportunities. The mean-10-second run reported only two opportunities, while the Phase 2 burst smoke reported none. Poisson-5 seconds is therefore the smallest matched smoke likely to exercise both queue variation and memory blocking.
+
+A fresh two-arm run is preferable to comparing only against the historical artifact: FIFO and unrestricted adaptive should use the same current T4 runtime, trace, sampled task order, generated arrival gaps, model, deadlines, and instrumentation. Because each arm is expected to take roughly 14--18 minutes, the paired experiment should budget 35--45 minutes including model startup, download, and analysis.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.

@@ -39,6 +39,8 @@ class Phase2Config:
     timing_mode: str = "estimated"
     eviction_policy: str = "none"
     cache_grace_s: float = 0.0
+    max_consecutive_resume_priorities: int = 0
+    resume_priority_head_age_limit_s: float = 0.0
 
     def scheduler_config(self) -> SchedulerConfig:
         return SchedulerConfig(
@@ -62,10 +64,17 @@ class Phase2Config:
             raise ValueError("estimated tool delay must be non-negative")
         if self.cache_grace_s < 0:
             raise ValueError("cache grace must be non-negative")
+        if self.max_consecutive_resume_priorities < 0:
+            raise ValueError("maximum consecutive resume priorities must be non-negative")
+        if self.resume_priority_head_age_limit_s < 0:
+            raise ValueError("resume priority head age limit must be non-negative")
         if self.eviction_policy not in {"none", "slot_aware"}:
             raise ValueError("eviction_policy must be none or slot_aware")
         if self.cache_grace_s and self.eviction_policy != "slot_aware":
             raise ValueError("cache grace requires slot-aware eviction")
+        if ((self.max_consecutive_resume_priorities or self.resume_priority_head_age_limit_s)
+                and not self.cache_grace_s):
+            raise ValueError("resume priority fairness requires cache grace")
 
 
 def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: dict) -> None:
@@ -74,8 +83,11 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
         "aging_threshold_s", "backfill_guard_s", "kv_safety_margin_cells",
         "reserve_per_waiting_task", "max_tool_reserve_cells", "reserve_horizon_s",
         "estimated_tool_delay_s", "timing_mode", "cache_grace_s",
+        "max_consecutive_resume_priorities", "resume_priority_head_age_limit_s",
     )
-    expected = {field: policy.get(field, 0.0 if field == "cache_grace_s" else None)
+    optional_zero = {"cache_grace_s", "max_consecutive_resume_priorities",
+                     "resume_priority_head_age_limit_s"}
+    expected = {field: policy.get(field, 0 if field in optional_zero else None)
                 for field in fields}
     mismatches = {field: (getattr(cfg, field), expected[field])
                   for field in fields if getattr(cfg, field) != expected[field]}
@@ -88,7 +100,8 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
 
 def _ready_request(state: RequestTaskState, task, rec: TaskRecord, ready_at: float,
                    sequence: int, estimator: RuntimeEstimator, deadline_s: float,
-                   preferred_worker: Optional[int] = None) -> ReadyRequest:
+                   preferred_worker: Optional[int] = None,
+                   resume_priority: bool = False) -> ReadyRequest:
     step = task.steps[state.next_step]
     runtime, fallback = estimator.predict(len(state.history), step.n_gen)
     return ReadyRequest(
@@ -102,6 +115,7 @@ def _ready_request(state: RequestTaskState, task, rec: TaskRecord, ready_at: flo
         deadline_at=rec.arrival + deadline_s,
         runtime_fallback=fallback,
         preferred_worker=preferred_worker,
+        resume_priority=resume_priority,
     )
 
 
@@ -127,6 +141,8 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
     evictions: list[dict] = []
     grace_deadline_by_task: dict[int, float] = {}
     grace_hit_tasks: set[int] = set()
+    resume_priority_streak = 0
+    pending_resume_priorities = 0
 
     def finish(state: RequestTaskState, status: str, error: Optional[str] = None) -> bool:
         nonlocal completed
@@ -184,7 +200,7 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
             await evict_slot(slot_id, reason)
 
     async def wait_for_tool(state: RequestTaskState, delay: float) -> None:
-        nonlocal enqueue_sequence
+        nonlocal enqueue_sequence, pending_resume_priorities
         rec = recs[state.task_index]
         left = rec.arrival + cfg.run.deadline_s - loop.time()
         if left <= 0 or delay >= left:
@@ -214,11 +230,38 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
             state.enqueued_at = state.runnable_at = now
             state.runnable = True
             enqueue_sequence += 1
+            head_age = max(0.0, now - scheduler.entries[0].ready_at) if scheduler.entries else 0.0
+            quota_blocked = bool(scheduler.entries) and (
+                pending_resume_priorities > 0
+                or (cfg.max_consecutive_resume_priorities > 0
+                    and resume_priority_streak >= cfg.max_consecutive_resume_priorities)
+            )
+            age_blocked = (
+                bool(scheduler.entries) and cfg.resume_priority_head_age_limit_s > 0
+                and head_age >= cfg.resume_priority_head_age_limit_s
+            )
+            grant_priority = grace_hit and not quota_blocked and not age_blocked
+            if grant_priority:
+                pending_resume_priorities += 1
+            if grace_hit:
+                decisions.append({
+                    "decision_sequence": None,
+                    "t": now - t0,
+                    "reason": ("resume_priority_granted" if grant_priority else
+                               "resume_priority_denied_age" if age_blocked else
+                               "resume_priority_denied_quota"),
+                    "selected_task_index": None,
+                    "returning_task_index": state.task_index,
+                    "queue_length": len(scheduler.entries),
+                    "head_age_s": head_age,
+                    "resume_priority_streak": resume_priority_streak,
+                })
             scheduler.put(_ready_request(state, tasks[state.task_index], rec, now,
                                          enqueue_sequence, estimator, cfg.run.deadline_s,
                                          slot_manager.preferred_slot(state.task_index)
-                                         if slot_manager else None),
-                          prioritize=grace_hit)
+                                         if slot_manager else None,
+                                         resume_priority=grant_priority),
+                          prioritize=grant_priority)
             timeline.mark(now, dq=+1, dready=+1, dtool=-1)
             condition.notify_all()
 
@@ -233,7 +276,11 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
             outcome = "ok"
             response = None
             cache_was_evicted = state.task_index in evicted_tasks
-            cache_grace_hit = state.task_index in grace_hit_tasks
+            cache_grace_return = state.task_index in grace_hit_tasks
+            cache_grace_hit = (
+                cache_grace_return and not cache_was_evicted and slot_manager is not None
+                and slot_manager.preferred_slot(state.task_index) == selection.worker
+            )
             grace_hit_tasks.discard(state.task_index)
             if slot_manager:
                 owner = slot_manager.owner(selection.worker)
@@ -282,7 +329,9 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                     scheduler_decision_sequence=selection.decision["decision_sequence"],
                     predicted_runtime_s=selection.request.predicted_runtime_s,
                     cache_was_evicted=cache_was_evicted,
+                    cache_grace_return=cache_grace_return,
                     cache_grace_hit=cache_grace_hit,
+                    resume_priority=selection.request.resume_priority,
                 )
                 requests.append(response)
                 if response["error"]:
@@ -347,6 +396,8 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                     raise failed_jobs[0].exception()
                 now = loop.time()
                 for entry in scheduler.expired(now):
+                    if entry.resume_priority:
+                        pending_resume_priorities = max(0, pending_resume_priorities - 1)
                     state = states[entry.task_index]
                     timeline.mark(now, dq=-1, dready=-1)
                     finish(state, "timeout_queued", "deadline while queued")
@@ -354,6 +405,8 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                 for entry in list(scheduler.entries):
                     if scheduler.infeasible(entry):
                         scheduler.remove_task(entry.task_index)
+                        if entry.resume_priority:
+                            pending_resume_priorities = max(0, pending_resume_priorities - 1)
                         timeline.mark(now, dq=-1, dready=-1)
                         finish(states[entry.task_index], "infeasible",
                                "request exceeds idle KV capacity")
@@ -407,6 +460,11 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                         decisions.append(decision)
                     if selection is None:
                         break
+                    if selection.request.resume_priority:
+                        pending_resume_priorities = max(0, pending_resume_priorities - 1)
+                        resume_priority_streak += 1
+                    else:
+                        resume_priority_streak = 0
                     dispatched = True
                     state = states[selection.request.task_index]
                     rec = recs[state.task_index]
@@ -479,9 +537,16 @@ def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFr
         "timing_mode": cfg.timing_mode,
         "eviction_policy": cfg.eviction_policy,
         "cache_grace_s": cfg.cache_grace_s,
+        "max_consecutive_resume_priorities": cfg.max_consecutive_resume_priorities,
+        "resume_priority_head_age_limit_s": cfg.resume_priority_head_age_limit_s,
         "adaptive_grace_holds": int((reasons == "adaptive_grace_hold").sum()),
+        "cache_grace_returns": int(requests.get(
+            "cache_grace_return", pd.Series(dtype=bool)).fillna(False).sum()),
         "cache_grace_hits": int(requests.get(
             "cache_grace_hit", pd.Series(dtype=bool)).fillna(False).sum()),
+        "resume_priority_grants": int((reasons == "resume_priority_granted").sum()),
+        "resume_priority_denied_quota": int((reasons == "resume_priority_denied_quota").sum()),
+        "resume_priority_denied_age": int((reasons == "resume_priority_denied_age").sum()),
         "grace_expired_evictions": sum(bool(row.get("grace_expired")) for row in evictions),
         "cache_evictions": len(evictions),
         "verified_reclaimed_cells": int(sum(row.get("reclaimed_cells") or 0 for row in evictions)),
@@ -577,6 +642,8 @@ def main() -> None:
     parser.add_argument("--timing-mode", choices=("estimated", "oracle"), default="estimated")
     parser.add_argument("--eviction-policy", choices=("none", "slot_aware"), default="none")
     parser.add_argument("--cache-grace", type=float, default=0.0)
+    parser.add_argument("--max-consecutive-resume-priorities", type=int, default=0)
+    parser.add_argument("--resume-priority-head-age-limit", type=float, default=0.0)
     parser.add_argument("--deadline", type=float, default=21600)
     parser.add_argument("--request-timeout", type=float, default=1800)
     parser.add_argument("--seed", type=int, default=2)
@@ -600,6 +667,8 @@ def main() -> None:
         estimated_tool_delay_s=args.estimated_tool_delay, timing_mode=args.timing_mode,
         eviction_policy=args.eviction_policy,
         cache_grace_s=args.cache_grace,
+        max_consecutive_resume_priorities=args.max_consecutive_resume_priorities,
+        resume_priority_head_age_limit_s=args.resume_priority_head_age_limit,
     )
     estimator = RuntimeEstimator.load(args.runtime_model)
     config.validate()

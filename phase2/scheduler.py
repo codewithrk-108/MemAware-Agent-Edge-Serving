@@ -45,6 +45,7 @@ class ReadyRequest:
     runtime_fallback: bool = False
     bypass_count: int = 0
     preferred_worker: Optional[int] = None
+    resume_priority: bool = False
 
     @property
     def predicted_kv_cells(self) -> int:

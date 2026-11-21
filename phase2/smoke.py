@@ -32,7 +32,8 @@ def run_config(name: str, trace: str, n_tasks: int, concurrency: int,
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--policy", choices=("phase1", "phase2", "phase2-slot",
-                                             "phase2-adaptive", "both"),
+                                             "phase2-adaptive", "phase2-fair-adaptive",
+                                             "both"),
                         default="both")
     parser.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
     parser.add_argument("--runtime-model", type=Path,
@@ -102,6 +103,27 @@ def main() -> None:
             cache_grace_s=0.5,
         )
         summaries["phase2_adaptive"] = execute_phase2(
+            config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
+
+    if args.policy == "phase2-fair-adaptive":
+        phase2_run = run_config("smoke_phase2_fair_adaptive_n4_burst_50", args.trace,
+                                args.n_tasks, args.concurrency, args.ctx, args.seed)
+        config = Phase2Config(
+            run=phase2_run,
+            aging_threshold_s=30,
+            backfill_guard_s=8,
+            kv_safety_margin_cells=512,
+            reserve_per_waiting_task=256,
+            max_tool_reserve_cells=4096,
+            reserve_horizon_s=5,
+            estimated_tool_delay_s=0.2,
+            timing_mode="estimated",
+            eviction_policy="slot_aware",
+            cache_grace_s=0.5,
+            max_consecutive_resume_priorities=1,
+            resume_priority_head_age_limit_s=30,
+        )
+        summaries["phase2_fair_adaptive"] = execute_phase2(
             config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
 
     print(json.dumps(summaries, indent=2, default=str))

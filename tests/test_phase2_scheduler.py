@@ -280,6 +280,57 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(requests[1]["cache_grace_hit"])
         self.assertTrue(any(row["reason"] == "adaptive_grace_hold" for row in decisions))
 
+    async def test_fair_resume_quota_requires_fifo_admission(self):
+        task_a = Task("a", "test", "test", [
+            Step([10], 1, 0.01), Step([11], 1, 0.01), Step([12], 1, None),
+        ])
+        tasks = [task_a, self.make_task("b", 20)]
+        fake = FakeComplete()
+        config = self.config()
+        config.eviction_policy = "slot_aware"
+        config.cache_grace_s = 0.05
+        config.max_consecutive_resume_priorities = 1
+
+        def fake_erase(url, slot_id, active_slots):
+            return EvictionResult(slot_id, 100, 50)
+
+        recs, requests, _, decisions, evictions, _ = await run_phase2(
+            config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
+            RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
+        self.assertTrue(all(record.status == "ok" for record in recs))
+        self.assertEqual(fake.calls, [10, 10, 20, 10])
+        self.assertTrue(requests[1]["resume_priority"])
+        self.assertFalse(requests[-1]["resume_priority"])
+        self.assertTrue(any(row["reason"] == "resume_priority_denied_quota"
+                            for row in decisions))
+        self.assertTrue(any(row["reason"] == "slot_reassignment" for row in evictions))
+
+    async def test_old_fifo_head_disables_resume_priority(self):
+        tasks = [self.make_task("a", 10, steps=2, delay=0.01), self.make_task("b", 20)]
+        fake = FakeComplete()
+        config = self.config()
+        config.eviction_policy = "slot_aware"
+        config.cache_grace_s = 0.05
+        config.max_consecutive_resume_priorities = 1
+        config.resume_priority_head_age_limit_s = 0.001
+
+        def fake_erase(url, slot_id, active_slots):
+            return EvictionResult(slot_id, 100, 50)
+
+        recs, requests, _, decisions, _, _ = await run_phase2(
+            config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
+            RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
+        self.assertTrue(all(record.status == "ok" for record in recs))
+        self.assertEqual(fake.calls, [10, 20, 10])
+        self.assertFalse(any(row["resume_priority"] for row in requests))
+        self.assertTrue(any(row["reason"] == "resume_priority_denied_age"
+                            for row in decisions))
+
+    def test_resume_fairness_requires_cache_grace(self):
+        config = self.config(max_consecutive_resume_priorities=1)
+        with self.assertRaisesRegex(ValueError, "requires cache grace"):
+            config.validate()
+
 
 if __name__ == "__main__":
     unittest.main()
