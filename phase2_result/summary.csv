@@ -1,0 +1,14 @@
+metric,phase1_fifo,phase2_two_queue,phase2_change_pct
+completed_tasks,46,46,0.000
+failed_tasks,4,4,0.000
+kv_context_errors,4,4,0.000
+throughput_tasks_min,3.363991,3.286150,-2.314
+completion_p50_s,390.838851,389.378327,-0.374
+completion_p95_s,692.016089,727.161290,5.079
+ready_queue_p95_s,552.557838,589.010451,6.597
+run_span_s,820.454045,839.888692,2.369
+cache_hit_ratio,0.570536,0.608349,6.628
+prefill_tokens_computed,131377,135209,2.917
+mean_kv_usage_ratio,0.568454,0.575672,1.270
+peak_kv_usage_ratio,0.999939,0.999817,-0.012
+

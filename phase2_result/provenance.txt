@@ -1,0 +1,7 @@
+started_utc=2026-11-21T04:27:12Z
+host=ip-172-31-46-52.us-west-2.compute.internal
+llama_server=/home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/llama-server
+model=/home/ec2-user/Qwen3-0.6B-Q8_0.gguf
+finished_utc=2026-11-21T04:55:37Z
+096485436351fc17f79921c2aeaf905593193eef06c2de8a011f03edac22d790  phase2/runtime_model_agenttrace_dev.json
+84a8ff891dce683ace8682787957dc888b2198aed36412554f355cdd1d2f15a1  data/traces/agenttrace_50_seed2.jsonl
