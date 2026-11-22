@@ -29,10 +29,10 @@ def run_config(name: str, trace: str, n_tasks: int, concurrency: int,
     )
 
 
-def quota_config(run: RunConfig) -> Phase2Config:
+def quota_config(run: RunConfig, aging_threshold_s: float = 30) -> Phase2Config:
     return Phase2Config(
         run=run,
-        aging_threshold_s=30,
+        aging_threshold_s=aging_threshold_s,
         backfill_guard_s=8,
         kv_safety_margin_cells=512,
         reserve_per_waiting_task=256,
@@ -53,6 +53,7 @@ def main() -> None:
                                              "phase2-adaptive", "phase2-fair-adaptive",
                                              "poisson5-adaptive", "poisson5-both",
                                              "quota-burst", "quota-poisson5", "quota-both",
+                                             "quota-age360-poisson5",
                                              "both"),
                         default="both")
     parser.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
@@ -189,6 +190,14 @@ def main() -> None:
         summaries["phase2_quota1_poisson5s"] = execute_phase2(
             quota_config(run), RuntimeEstimator.load(args.runtime_model),
             group=args.output_group)
+
+    if args.policy == "quota-age360-poisson5":
+        run = run_config("smoke_phase2_quota1_age360_n4_poisson5s_50", args.trace,
+                         args.n_tasks, args.concurrency, args.ctx, args.seed,
+                         arrival_rate=0.2)
+        summaries["phase2_quota1_age360_poisson5s"] = execute_phase2(
+            quota_config(run, aging_threshold_s=360),
+            RuntimeEstimator.load(args.runtime_model), group=args.output_group)
 
     print(json.dumps(summaries, indent=2, default=str))
 

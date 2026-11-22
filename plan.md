@@ -634,3 +634,24 @@ Compare completion, failures, throughput, completion and queue p50/p95, grace re
 The user explicitly approved implementation, both adaptive runs, reuse of existing FIFO artifacts, and an experiment-specific commit on 2026-11-21.
 
 Both arms completed 50/50 with zero KV failures. Burst quota materially improved fairness versus unrestricted adaptive but remained slower than FIFO; Poisson quota did not improve p95 versus unrestricted adaptive. This supports workload-aware quota activation rather than a universal one-for-one rule.
+
+## Aging-360 and cost-aware dynamic-resume experiments
+
+I want to build two matched Poisson-5s experiments that extend the Phase 2 scheduler to test whether a realistic backfill window and a cost-sensitive cache-resume decision improve the balance of throughput, success rate, and latency.
+
+Experiment 1 keeps the current one-resume/one-FIFO implementation, 500 ms cache grace, slot-aware eviction, and all reservation settings, changing only `aging_threshold_s` from 30 to 360. Experiment 2 restores `aging_threshold_s=30`, disables the fixed resume quota and cutoff, and grants resume priority only when estimated recomputation time saved exceeds a queue-delay cost. Both use the existing 50-task AgentTrace Poisson-5s workload, seed 2, concurrency 4, 32K KV, and frozen estimated runtime model. Existing FIFO results will not be rerun.
+
+The cost-aware score will be logged with its inputs. Validation requires focused configuration and scoring tests, the full local suite, remote artifact checks, and comparison of success, throughput, p50/p95, queue latency, cache reuse/recomputation, KV utilization, and backfill. Each experiment receives its own commit.
+
+### Approved todos
+
+- [x] Record the matched configurations and isolate the changed variables.
+- [x] Add the uniquely named aging-360 Poisson smoke configuration and test.
+- [x] Validate, run, download, analyze, and commit the aging-360 experiment.
+- [ ] Implement and test cost-aware dynamic resume priority with decision telemetry.
+- [ ] Run, download, analyze, and commit the cost-aware experiment.
+- [ ] Compare both experiments with each other and existing FIFO/quota baselines.
+
+The user explicitly approved implementation and both AWS runs on 2026-11-22.
+
+The aging-360 arm completed 50/50 tasks with zero KV errors and produced nine actual backfill admissions. Relative to aging-30 quota, p95 improved 0.6% and ready-queue p95 improved 2.7%, while throughput fell 2.7%, p50 increased 0.8%, and computed prefill increased 13.5%. The larger window enables backfill but does not by itself deliver a material end-to-end improvement.

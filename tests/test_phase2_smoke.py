@@ -24,6 +24,19 @@ class Phase2SmokeConfigTests(unittest.TestCase):
         self.assertEqual(config.resume_priority_head_age_limit_s, 0)
         self.assertEqual(config.eviction_policy, "slot_aware")
 
+    def test_age360_config_changes_only_aging_threshold(self):
+        run = run_config("test", "trace.jsonl", 50, 4, 32768, 2,
+                         arrival_rate=0.2)
+        baseline = quota_config(run)
+        age360 = quota_config(run, aging_threshold_s=360)
+        self.assertEqual(age360.aging_threshold_s, 360)
+        self.assertEqual(age360.max_consecutive_resume_priorities, 1)
+        self.assertEqual(age360.resume_priority_head_age_limit_s, 0)
+        self.assertEqual(
+            {key: value for key, value in vars(age360).items() if key != "aging_threshold_s"},
+            {key: value for key, value in vars(baseline).items() if key != "aging_threshold_s"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -77,6 +77,12 @@ Run this policy on both existing smoke arrival patterns—50-task burst and matc
 
 Both quota runs completed 50/50 tasks with zero KV failures. Relative to unrestricted adaptive, burst quota improved p50/p95 by 18.5%/6.8% at a 2.1% throughput cost; Poisson quota improved p50 4.2% but worsened p95 2.2% at a 4.1% throughput cost. Neither quota run beat plain FIFO latency, although FIFO failed four tasks in each workload. Quota is therefore most promising as a burst-sensitive fairness control rather than an always-on policy.
 
+### Aging-threshold and cost-aware follow-up
+
+The Poisson quota decision log shows blocked FIFO heads aged roughly 274--303 seconds. With the current 30-second aging threshold, their backfill allowance is already zero. Raising only the scheduler aging threshold to 360 seconds gives those observed heads about 49--78 seconds of guarded allowance and can admit many median-sized requests while preserving the one-resume/one-FIFO policy.
+
+The second experiment replaces the fixed resume quota with a dynamic decision at a 30-second aging threshold. It should grant a within-grace resume only when estimated saved prefill time exceeds the delay cost imposed on queued FIFO work. This needs explicit benefit, cost, score, and denial-reason logging so any latency/cache-reuse tradeoff is attributable to the policy rather than inferred from aggregate results.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.
