@@ -57,6 +57,7 @@ def main() -> None:
                                              "cost-aware-poisson5",
                                              "cost-aware-r4",
                                              "cost-aware-r5-age30",
+                                             "cost-aware-r5-age360",
                                              "both"),
                         default="both")
     parser.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
@@ -233,6 +234,17 @@ def main() -> None:
         config.cost_aware_resume = True
         config.resume_queue_cost_weight = 0.25
         summaries["phase2_cost_aware_r5_age30"] = execute_phase2(
+            config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
+
+    if args.policy == "cost-aware-r5-age360":
+        run = run_config("full_phase2_cost_aware_n16_poisson2s_500_age360", args.trace,
+                         args.n_tasks, args.concurrency, args.ctx, args.seed,
+                         arrival_rate=0.5)
+        config = quota_config(run, aging_threshold_s=360)
+        config.max_consecutive_resume_priorities = 0
+        config.cost_aware_resume = True
+        config.resume_queue_cost_weight = 0.25
+        summaries["phase2_cost_aware_r5_age360"] = execute_phase2(
             config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
 
     print(json.dumps(summaries, indent=2, default=str))

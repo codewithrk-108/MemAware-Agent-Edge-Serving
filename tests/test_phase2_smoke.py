@@ -66,6 +66,20 @@ class Phase2SmokeConfigTests(unittest.TestCase):
         self.assertEqual(config.aging_threshold_s, 30)
         self.assertEqual(config.run.server.ctx, 32768)
 
+    def test_r5_age360_changes_only_aging_threshold(self):
+        run = run_config("r5", "trace.jsonl", 500, 16, 32768, 2,
+                         arrival_rate=0.5)
+        age30 = quota_config(run, aging_threshold_s=30)
+        age360 = quota_config(run, aging_threshold_s=360)
+        for config in (age30, age360):
+            config.max_consecutive_resume_priorities = 0
+            config.cost_aware_resume = True
+        self.assertEqual(age360.aging_threshold_s, 360)
+        self.assertEqual(
+            {key: value for key, value in vars(age360).items() if key != "aging_threshold_s"},
+            {key: value for key, value in vars(age30).items() if key != "aging_threshold_s"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -688,7 +688,7 @@ Both runs use the 500-task AgentTrace seed-2 trace, N=16, Poisson arrival rate 0
 - [x] Verify both T4 hosts, instrumented runtimes, models, disk constraints, and idle state.
 - [x] Add and test the uniquely named age-30 R5 configuration.
 - [ ] Commit and deploy age-30 as its own experiment.
-- [ ] Add, test, commit, and deploy age-360 as its own experiment.
+- [x] Add and test age-360 as its own experiment.
 - [ ] Start both runs detached and verify independent server startup.
 - [ ] Archive complete logs/results and stop each instance after completion.
 - [ ] Retrieve, commit, push, and compare both against FIFO R5 after restart.
