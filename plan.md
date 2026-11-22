@@ -676,3 +676,21 @@ The run uses AgentTrace seed 2, 500 tasks, N=4, Poisson arrival rate 0.5 tasks/s
 The user explicitly approved the full run, GitHub result publication, and stopping the instance after completion on 2026-11-22.
 
 The run completed 500/500 tasks with no KV-context errors at 4.200 tasks/min. Relative to FIFO R4, it eliminated 28 failures, retained 98.6% of throughput, and improved p50 by 12.2%, but p95 increased by 16.2%. The detached archive-and-shutdown supervisor completed with status zero and successfully stopped the instance.
+
+## Full R5 cost-aware aging comparison
+
+I want to build two matched full R5 experiments that extend the cost-aware scheduler to N=16 and isolate whether increasing aging from 30 to 360 seconds creates useful backfill opportunities under extreme KV pressure.
+
+Both runs use the 500-task AgentTrace seed-2 trace, N=16, Poisson arrival rate 0.5 tasks/s, 32K unified KV, 500 ms cache grace, slot-aware eviction, queue-cost weight 0.25, and the frozen estimated runtime model. The age-30 run executes on `34.213.238.178`; the age-360 run executes concurrently on `18.237.207.197`. Each has a unique output group, supervisor log, archive, and post-run shutdown.
+
+### Approved todos
+
+- [x] Verify both T4 hosts, instrumented runtimes, models, disk constraints, and idle state.
+- [x] Add and test the uniquely named age-30 R5 configuration.
+- [ ] Commit and deploy age-30 as its own experiment.
+- [ ] Add, test, commit, and deploy age-360 as its own experiment.
+- [ ] Start both runs detached and verify independent server startup.
+- [ ] Archive complete logs/results and stop each instance after completion.
+- [ ] Retrieve, commit, push, and compare both against FIFO R5 after restart.
+
+The user explicitly approved both parallel R5 runs, artifact handling, and post-run instance stopping on 2026-11-22.

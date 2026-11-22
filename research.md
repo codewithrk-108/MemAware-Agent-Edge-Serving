@@ -91,6 +91,12 @@ The approved EC2 workspace is not a Git checkout, has no GitHub credential/deplo
 
 The unattended supervisor pattern was validated by the full R4 run: launch with `nohup`, stream a dedicated supervisor log, archive the output group, call `sync`, and schedule `sudo shutdown -h +1` only after the benchmark and archive complete. The instance stopped rather than terminating and retained its EBS artifacts across restart. Reuse this pattern for later long runs on this instance.
 
+### Full R5 aging comparison
+
+Phase 1 R5 uses 500 tasks, N=16, Poisson mean 2-second arrivals, and a 32K unified KV pool. FIFO completed only 100/500 tasks at 5.55 completed tasks/min; its p50/p95 of 127/270 seconds are strongly survivor-biased. The matched Phase 2 experiment compares cost-aware aging thresholds 30 and 360 on separate T4 instances while holding trace, seed, runtime, model, KV pool, cache grace, cost weight, and all other scheduler settings fixed.
+
+The age-30 host reuses the validated R4 workspace. The age-360 host has the same instrumented llama.cpp binary and model but only 1.1 GB free, so it requires a minimal source-only workspace using its existing Python virtual environment. Both runs use the validated detached archive, sync, and one-minute shutdown sequence.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.

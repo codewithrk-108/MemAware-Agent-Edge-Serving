@@ -54,6 +54,18 @@ class Phase2SmokeConfigTests(unittest.TestCase):
         self.assertEqual(run.arrival_rate, 0.5)
         self.assertEqual(run.server.ctx, 32768)
 
+    def test_r5_age30_workload_and_policy_settings(self):
+        run = run_config("r5", "trace.jsonl", 500, 16, 32768, 2,
+                         arrival_rate=0.5)
+        config = quota_config(run, aging_threshold_s=30)
+        config.max_consecutive_resume_priorities = 0
+        config.cost_aware_resume = True
+        self.assertEqual(config.run.n_tasks, 500)
+        self.assertEqual(config.run.concurrency, 16)
+        self.assertEqual(config.run.arrival_rate, 0.5)
+        self.assertEqual(config.aging_threshold_s, 30)
+        self.assertEqual(config.run.server.ctx, 32768)
+
 
 if __name__ == "__main__":
     unittest.main()
