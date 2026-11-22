@@ -687,10 +687,12 @@ Both runs use the 500-task AgentTrace seed-2 trace, N=16, Poisson arrival rate 0
 
 - [x] Verify both T4 hosts, instrumented runtimes, models, disk constraints, and idle state.
 - [x] Add and test the uniquely named age-30 R5 configuration.
-- [ ] Commit and deploy age-30 as its own experiment.
+- [x] Commit and deploy age-30 as its own experiment.
 - [x] Add and test age-360 as its own experiment.
-- [ ] Start both runs detached and verify independent server startup.
-- [ ] Archive complete logs/results and stop each instance after completion.
-- [ ] Retrieve, commit, push, and compare both against FIFO R5 after restart.
+- [x] Start both runs detached and verify independent server startup.
+- [x] Archive complete logs/results and stop each instance after completion.
+- [x] Retrieve, commit, push, and compare both against FIFO R5 after restart.
 
 The user explicitly approved both parallel R5 runs, artifact handling, and post-run instance stopping on 2026-11-22.
+
+Both runs completed 500/500 tasks without KV-context errors. Aging 360 admitted 135 backfills versus 38 at aging 30 and modestly improved throughput, p50, p95, queue length, and average running concurrency, while increasing cache recomputation. Complete raw artifacts, supervisor logs, and checksum-verified archives were retrieved for publication.

@@ -97,6 +97,8 @@ Phase 1 R5 uses 500 tasks, N=16, Poisson mean 2-second arrivals, and a 32K unifi
 
 The age-30 host reuses the validated R4 workspace. The age-360 host has the same instrumented llama.cpp binary and model but only 1.1 GB free, so it requires a minimal source-only workspace using its existing Python virtual environment. Both runs use the validated detached archive, sync, and one-minute shutdown sequence.
 
+Both R5 policies completed 500/500 tasks with zero KV-context failures. Raising aging from 30 to 360 increased backfills from 38 to 135, reduced average queue length from 222.0 to 207.0, and improved p50/p95 by 4.5%/1.8%. It also reduced cache-hit ratio from 45.8% to 44.1% and increased recomputed prompt tokens 4.8%, explaining why the large increase in backfill produced only modest end-to-end gains.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.
