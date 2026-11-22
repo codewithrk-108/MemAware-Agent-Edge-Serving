@@ -7,7 +7,8 @@ import numpy as np
 from phase1.runner import RunConfig
 from phase2.estimator import RuntimeEstimator
 from phase2.cache import EvictionResult
-from phase2.runner import Phase2Config, _resume_priority_blocked, run_phase2
+from phase2.runner import (Phase2Config, _resume_priority_blocked,
+                           _resume_priority_score, run_phase2)
 from phase2.scheduler import ReadyRequest, SchedulerConfig, TwoQueueScheduler
 from workloads.trace import Step, Task
 
@@ -350,6 +351,21 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_resume_fairness_requires_cache_grace(self):
         config = self.config(max_consecutive_resume_priorities=1)
+        with self.assertRaisesRegex(ValueError, "requires cache grace"):
+            config.validate()
+
+    def test_cost_aware_resume_score_balances_recompute_and_queue_delay(self):
+        score, benefit, cost = _resume_priority_score(
+            2000, 27, 4, 4, 30, 30, 0.0026, 0.25)
+        self.assertAlmostEqual(benefit, 5.2)
+        self.assertAlmostEqual(cost, 3.375)
+        self.assertGreater(score, 0)
+        score, _, _ = _resume_priority_score(
+            500, 27, 4, 4, 30, 30, 0.0026, 0.25)
+        self.assertLess(score, 0)
+
+    def test_cost_aware_resume_requires_cache_grace(self):
+        config = self.config(cost_aware_resume=True)
         with self.assertRaisesRegex(ValueError, "requires cache grace"):
             config.validate()
 

@@ -37,6 +37,15 @@ class Phase2SmokeConfigTests(unittest.TestCase):
             {key: value for key, value in vars(baseline).items() if key != "aging_threshold_s"},
         )
 
+    def test_cost_aware_policy_settings(self):
+        run = run_config("cost", "trace.jsonl", 50, 4, 32768, 2,
+                         arrival_rate=0.2)
+        config = quota_config(run)
+        config.max_consecutive_resume_priorities = 0
+        config.cost_aware_resume = True
+        self.assertEqual(config.aging_threshold_s, 30)
+        self.assertEqual(config.resume_queue_cost_weight, 0.25)
+
 
 if __name__ == "__main__":
     unittest.main()

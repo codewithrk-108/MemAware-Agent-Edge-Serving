@@ -648,10 +648,12 @@ The cost-aware score will be logged with its inputs. Validation requires focused
 - [x] Record the matched configurations and isolate the changed variables.
 - [x] Add the uniquely named aging-360 Poisson smoke configuration and test.
 - [x] Validate, run, download, analyze, and commit the aging-360 experiment.
-- [ ] Implement and test cost-aware dynamic resume priority with decision telemetry.
-- [ ] Run, download, analyze, and commit the cost-aware experiment.
-- [ ] Compare both experiments with each other and existing FIFO/quota baselines.
+- [x] Implement and test cost-aware dynamic resume priority with decision telemetry.
+- [x] Run, download, analyze, and commit the cost-aware experiment.
+- [x] Compare both experiments with each other and existing FIFO/quota baselines.
 
 The user explicitly approved implementation and both AWS runs on 2026-11-22.
 
 The aging-360 arm completed 50/50 tasks with zero KV errors and produced nine actual backfill admissions. Relative to aging-30 quota, p95 improved 0.6% and ready-queue p95 improved 2.7%, while throughput fell 2.7%, p50 increased 0.8%, and computed prefill increased 13.5%. The larger window enables backfill but does not by itself deliver a material end-to-end improvement.
+
+The cost-aware aging-30 arm also completed 50/50 without KV errors. It improved throughput, p50, p95, cache-hit ratio, and prefill work versus both quota arms, but granted 39 of 40 within-grace returns. The result is promising but the low denial count means a weight sensitivity experiment is required to separate cost-gating benefit from run variance and near-unrestricted resume behavior.

@@ -30,6 +30,18 @@ def _resume_priority_blocked(limit: int, streak: int, pending: int) -> bool:
     return limit > 0 and (streak >= limit or pending >= limit)
 
 
+def _resume_priority_score(prompt_tokens: int, predicted_runtime_s: float,
+                           queue_length: int, concurrency: int, head_age_s: float,
+                           aging_threshold_s: float, prefill_s_per_token: float,
+                           queue_cost_weight: float) -> tuple[float, float, float]:
+    benefit = prompt_tokens * prefill_s_per_token
+    pressure = min(1.0, queue_length / concurrency) if concurrency else 1.0
+    age_ratio = min(1.0, head_age_s / aging_threshold_s) if aging_threshold_s else 1.0
+    cost = (queue_cost_weight * predicted_runtime_s * pressure * (1.0 + age_ratio)
+            / max(1, concurrency))
+    return benefit - cost, benefit, cost
+
+
 @dataclass
 class Phase2Config:
     run: RunConfig
@@ -45,6 +57,8 @@ class Phase2Config:
     cache_grace_s: float = 0.0
     max_consecutive_resume_priorities: int = 0
     resume_priority_head_age_limit_s: float = 0.0
+    cost_aware_resume: bool = False
+    resume_queue_cost_weight: float = 0.25
 
     def scheduler_config(self) -> SchedulerConfig:
         return SchedulerConfig(
@@ -72,6 +86,8 @@ class Phase2Config:
             raise ValueError("maximum consecutive resume priorities must be non-negative")
         if self.resume_priority_head_age_limit_s < 0:
             raise ValueError("resume priority head age limit must be non-negative")
+        if self.resume_queue_cost_weight < 0:
+            raise ValueError("resume queue cost weight must be non-negative")
         if self.eviction_policy not in {"none", "slot_aware"}:
             raise ValueError("eviction_policy must be none or slot_aware")
         if self.cache_grace_s and self.eviction_policy != "slot_aware":
@@ -79,6 +95,8 @@ class Phase2Config:
         if ((self.max_consecutive_resume_priorities or self.resume_priority_head_age_limit_s)
                 and not self.cache_grace_s):
             raise ValueError("resume priority fairness requires cache grace")
+        if self.cost_aware_resume and not self.cache_grace_s:
+            raise ValueError("cost-aware resume requires cache grace")
 
 
 def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: dict) -> None:
@@ -88,10 +106,16 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
         "reserve_per_waiting_task", "max_tool_reserve_cells", "reserve_horizon_s",
         "estimated_tool_delay_s", "timing_mode", "cache_grace_s",
         "max_consecutive_resume_priorities", "resume_priority_head_age_limit_s",
+        "cost_aware_resume", "resume_queue_cost_weight",
     )
-    optional_zero = {"cache_grace_s", "max_consecutive_resume_priorities",
-                     "resume_priority_head_age_limit_s"}
-    expected = {field: policy.get(field, 0 if field in optional_zero else None)
+    optional_defaults = {
+        "cache_grace_s": 0,
+        "max_consecutive_resume_priorities": 0,
+        "resume_priority_head_age_limit_s": 0,
+        "cost_aware_resume": False,
+        "resume_queue_cost_weight": 0.25,
+    }
+    expected = {field: policy.get(field, optional_defaults.get(field))
                 for field in fields}
     mismatches = {field: (getattr(cfg, field), expected[field])
                   for field in fields if getattr(cfg, field) != expected[field]}
@@ -244,7 +268,23 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                 bool(scheduler.entries) and cfg.resume_priority_head_age_limit_s > 0
                 and head_age >= cfg.resume_priority_head_age_limit_s
             )
-            grant_priority = grace_hit and not quota_blocked and not age_blocked
+            resume_request = _ready_request(
+                state, tasks[state.task_index], rec, now, enqueue_sequence,
+                estimator, cfg.run.deadline_s,
+                slot_manager.preferred_slot(state.task_index) if slot_manager else None,
+            )
+            score = benefit = cost = None
+            cost_blocked = False
+            if grace_hit and cfg.cost_aware_resume and scheduler.entries:
+                score, benefit, cost = _resume_priority_score(
+                    resume_request.prompt_tokens, resume_request.predicted_runtime_s,
+                    len(scheduler.entries), cfg.run.concurrency, head_age,
+                    cfg.aging_threshold_s, estimator.prefill_s_per_token,
+                    cfg.resume_queue_cost_weight,
+                )
+                cost_blocked = score < 0
+            grant_priority = (grace_hit and not quota_blocked and not age_blocked
+                              and not cost_blocked)
             if grant_priority:
                 pending_resume_priorities += 1
             if grace_hit:
@@ -253,19 +293,19 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                     "t": now - t0,
                     "reason": ("resume_priority_granted" if grant_priority else
                                "resume_priority_denied_age" if age_blocked else
+                               "resume_priority_denied_cost" if cost_blocked else
                                "resume_priority_denied_quota"),
                     "selected_task_index": None,
                     "returning_task_index": state.task_index,
                     "queue_length": len(scheduler.entries),
                     "head_age_s": head_age,
                     "resume_priority_streak": resume_priority_streak,
+                    "resume_score_s": score,
+                    "resume_benefit_s": benefit,
+                    "resume_queue_cost_s": cost,
                 })
-            scheduler.put(_ready_request(state, tasks[state.task_index], rec, now,
-                                         enqueue_sequence, estimator, cfg.run.deadline_s,
-                                         slot_manager.preferred_slot(state.task_index)
-                                         if slot_manager else None,
-                                         resume_priority=grant_priority),
-                          prioritize=grant_priority)
+            resume_request.resume_priority = grant_priority
+            scheduler.put(resume_request, prioritize=grant_priority)
             timeline.mark(now, dq=+1, dready=+1, dtool=-1)
             condition.notify_all()
 
@@ -557,6 +597,8 @@ def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFr
         "cache_grace_s": cfg.cache_grace_s,
         "max_consecutive_resume_priorities": cfg.max_consecutive_resume_priorities,
         "resume_priority_head_age_limit_s": cfg.resume_priority_head_age_limit_s,
+        "cost_aware_resume": cfg.cost_aware_resume,
+        "resume_queue_cost_weight": cfg.resume_queue_cost_weight,
         "adaptive_grace_holds": int((reasons == "adaptive_grace_hold").sum()),
         "cache_grace_returns": int(requests.get(
             "cache_grace_return", pd.Series(dtype=bool)).fillna(False).sum()),
@@ -565,6 +607,7 @@ def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFr
         "resume_priority_grants": int((reasons == "resume_priority_granted").sum()),
         "resume_priority_denied_quota": int((reasons == "resume_priority_denied_quota").sum()),
         "resume_priority_denied_age": int((reasons == "resume_priority_denied_age").sum()),
+        "resume_priority_denied_cost": int((reasons == "resume_priority_denied_cost").sum()),
         "grace_expired_evictions": sum(bool(row.get("grace_expired")) for row in evictions),
         "cache_evictions": len(evictions),
         "verified_reclaimed_cells": int(sum(row.get("reclaimed_cells") or 0 for row in evictions)),
@@ -662,6 +705,8 @@ def main() -> None:
     parser.add_argument("--cache-grace", type=float, default=0.0)
     parser.add_argument("--max-consecutive-resume-priorities", type=int, default=0)
     parser.add_argument("--resume-priority-head-age-limit", type=float, default=0.0)
+    parser.add_argument("--cost-aware-resume", action="store_true")
+    parser.add_argument("--resume-queue-cost-weight", type=float, default=0.25)
     parser.add_argument("--deadline", type=float, default=21600)
     parser.add_argument("--request-timeout", type=float, default=1800)
     parser.add_argument("--seed", type=int, default=2)
@@ -687,6 +732,8 @@ def main() -> None:
         cache_grace_s=args.cache_grace,
         max_consecutive_resume_priorities=args.max_consecutive_resume_priorities,
         resume_priority_head_age_limit_s=args.resume_priority_head_age_limit,
+        cost_aware_resume=args.cost_aware_resume,
+        resume_queue_cost_weight=args.resume_queue_cost_weight,
     )
     estimator = RuntimeEstimator.load(args.runtime_model)
     config.validate()
