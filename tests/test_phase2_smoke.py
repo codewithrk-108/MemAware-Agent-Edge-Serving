@@ -46,6 +46,14 @@ class Phase2SmokeConfigTests(unittest.TestCase):
         self.assertEqual(config.aging_threshold_s, 30)
         self.assertEqual(config.resume_queue_cost_weight, 0.25)
 
+    def test_r4_workload_settings(self):
+        run = run_config("r4", "trace.jsonl", 500, 4, 32768, 2,
+                         arrival_rate=0.5)
+        self.assertEqual(run.n_tasks, 500)
+        self.assertEqual(run.concurrency, 4)
+        self.assertEqual(run.arrival_rate, 0.5)
+        self.assertEqual(run.server.ctx, 32768)
+
 
 if __name__ == "__main__":
     unittest.main()

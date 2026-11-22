@@ -83,6 +83,12 @@ The Poisson quota decision log shows blocked FIFO heads aged roughly 274--303 se
 
 The second experiment replaces the fixed resume quota with a dynamic decision at a 30-second aging threshold. It should grant a within-grace resume only when estimated saved prefill time exceeds the delay cost imposed on queued FIFO work. This needs explicit benefit, cost, score, and denial-reason logging so any latency/cache-reuse tradeoff is attributable to the policy rather than inferred from aggregate results.
 
+### Full R4 cost-aware evaluation
+
+R4 is the strongest Phase 1 headline comparison for the cost-aware scheduler: N=4, Poisson mean 2-second arrivals, 32K unified KV, and 500 tasks. FIFO completed 472/500 at 4.26 tasks/min, reached 99.9% peak KV occupancy, and had p50/p95 completion of 3,984/5,420 seconds over successful tasks. This preserves the selected N=4 operating point while creating sustained memory and queue pressure.
+
+The approved EC2 workspace is not a Git checkout, has no GitHub credential/deploy key, and has no IAM instance role. It can run independently and preserve results on its EBS volume, but cannot push to GitHub or invoke the EC2 StopInstances API without additional credentials. Passwordless OS shutdown is available; instance-initiated shutdown must only be used when its EC2 behavior is known to be stop rather than terminate.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.

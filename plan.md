@@ -657,3 +657,20 @@ The user explicitly approved implementation and both AWS runs on 2026-11-22.
 The aging-360 arm completed 50/50 tasks with zero KV errors and produced nine actual backfill admissions. Relative to aging-30 quota, p95 improved 0.6% and ready-queue p95 improved 2.7%, while throughput fell 2.7%, p50 increased 0.8%, and computed prefill increased 13.5%. The larger window enables backfill but does not by itself deliver a material end-to-end improvement.
 
 The cost-aware aging-30 arm also completed 50/50 without KV errors. It improved throughput, p50, p95, cache-hit ratio, and prefill work versus both quota arms, but granted 39 of 40 within-grace returns. The result is promising but the low denial count means a weight sensitivity experiment is required to separate cost-gating benefit from run variance and near-unrestricted resume behavior.
+
+## Full R4 cost-aware evaluation
+
+I want to build a uniquely named full-run configuration that extends the validated cost-aware aging scheduler to the Phase 1 R4 workload and produces a direct 500-task comparison under sustained KV pressure.
+
+The run uses AgentTrace seed 2, 500 tasks, N=4, Poisson arrival rate 0.5 tasks/s (mean 2 seconds), 32K unified KV, aging 30 seconds, backfill guard 8 seconds, 500 ms cache grace, slot-aware eviction, estimated timing, no fixed resume quota, and queue-cost weight 0.25. It will execute detached on the approved T4 and write raw artifacts plus a supervisor log to a unique output group.
+
+### Approved todos
+
+- [x] Add and test a uniquely named R4 cost-aware configuration.
+- [ ] Deploy the validated configuration and start it detached.
+- [ ] Preserve complete raw artifacts and logs on the instance.
+- [ ] Upload results to GitHub if an authenticated remote path is available.
+- [ ] Stop—not terminate—the instance after execution using a verified safe control path.
+- [ ] Compare against the Phase 1 R4 FIFO result after artifacts are available.
+
+The user explicitly approved the full run, GitHub result publication, and stopping the instance after completion on 2026-11-22.
