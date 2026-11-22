@@ -612,3 +612,25 @@ The predeclared success target is 50/50 completion with zero KV failures, at lea
 Every subsequent experiment must receive its own scoped commit containing its implementation, tests, configuration, documentation, and result artifacts. Commit messages should identify the algorithm or experiment, for example `Add unrestricted adaptive Poisson-5s experiment`.
 
 The valid adaptive arm completed 50/50 tasks with zero KV failures and exceeded FIFO completed-task throughput by 6.10%, but missed the predeclared p95 target by increasing completion p95 22.23%. Backfill candidate count remained zero. The final implementation also corrects unrestricted-limit semantics and enforces per-request slot compatibility under overlapping Poisson returns.
+
+## One-resume/one-FIFO burst and Poisson experiment
+
+I want to build a new experiment `one-resume/one-FIFO adaptive scheduling` that extends the 500 ms slot-aware grace policy to improve FIFO latency while retaining useful KV reuse. It tests only the admission quota: one priority resume must be followed by one ordinary FIFO admission when older work exists. Resume-priority age cutoff remains disabled.
+
+Two adaptive-only arms will run with 50 AgentTrace tasks, seed 2, N=4, 32K unified KV, prompt reuse enabled, host cache disabled, estimated timing, `cache_grace_s=0.5`, `max_consecutive_resume_priorities=1`, and `resume_priority_head_age_limit_s=0`. One arm uses burst arrivals and the other Poisson rate 0.2 tasks/s. Existing matched FIFO artifacts are the baselines and must not be rerun.
+
+Compare completion, failures, throughput, completion and queue p50/p95, grace returns/hits, priority grants/quota denials, recomputation, evictions, mean/peak KV, queue length, concurrency, and backfill. Store each raw run under a unique name and create one scoped commit named `Add one-resume one-FIFO adaptive experiments`.
+
+### One-resume/one-FIFO todos
+
+- [x] Add uniquely named quota-only burst and Poisson smoke configurations.
+- [x] Add configuration tests proving quota 1 and resume-age cutoff 0.
+- [x] Run the full local and remote focused test suites.
+- [x] Run only the two adaptive arms on the approved T4 instance.
+- [x] Download and validate full outputs, settings, and matching workload signatures.
+- [x] Compare burst and Poisson results against existing FIFO artifacts.
+- [x] Commit implementation, tests, documentation, provenance, and valid raw results together.
+
+The user explicitly approved implementation, both adaptive runs, reuse of existing FIFO artifacts, and an experiment-specific commit on 2026-11-21.
+
+Both arms completed 50/50 with zero KV failures. Burst quota materially improved fairness versus unrestricted adaptive but remained slower than FIFO; Poisson quota did not improve p95 versus unrestricted adaptive. This supports workload-aware quota activation rather than a universal one-for-one rule.

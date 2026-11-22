@@ -69,6 +69,14 @@ A fresh two-arm run is preferable to comparing only against the historical artif
 
 The matched run confirmed the historical FIFO result (46/50, four KV failures, 3.255 tasks/min) and completed 50/50 adaptively at 3.454 tasks/min with no KV failures. Adaptive reduced prefill work by 30.7% and produced 38 actual grace hits, but completion p95 increased 22.2%. Poisson-5 seconds exposed seven FIFO diagnostic opportunities but zero eligible Phase 2 candidates: most blocked heads were already older than the aging threshold and had zero runtime allowance. The test also exposed and fixed two overlapping-return bugs: zero fairness now means truly unrestricted, and a request can be assigned only its retained slot or an unowned slot.
 
+### One-resume/one-FIFO experiment
+
+The next isolated variable is resume quota: `cache_grace_s=0.5`, `max_consecutive_resume_priorities=1`, and `resume_priority_head_age_limit_s=0`. Unlike the earlier fair-adaptive run, no 30-second resume cutoff is enabled. The quota should deny only consecutive priority returns when older FIFO work exists, allowing the next ordinary admission to reopen resume priority.
+
+Run this policy on both existing smoke arrival patterns—50-task burst and matched Poisson-5 seconds—without rerunning FIFO. Compare against `smoke_phase1_fifo_n4_burst_50` and `smoke_phase1_fifo_n4_poisson5s_50`. This isolates whether quota alone recovers p50/p95 while retaining more KV reuse than the cutoff-dominated fair policy.
+
+Both quota runs completed 50/50 tasks with zero KV failures. Relative to unrestricted adaptive, burst quota improved p50/p95 by 18.5%/6.8% at a 2.1% throughput cost; Poisson quota improved p50 4.2% but worsened p95 2.2% at a 4.1% throughput cost. Neither quota run beat plain FIFO latency, although FIFO failed four tasks in each workload. Quota is therefore most promising as a burst-sensitive fairness control rather than an always-on policy.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.
