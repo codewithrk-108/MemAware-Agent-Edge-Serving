@@ -22,3 +22,9 @@ Increasing aging from 30 to 360 seconds created 97 additional backfill admission
 Both Phase 2 policies eliminated all 400 FIFO KV-context failures. FIFO's 127/270-second p50/p95 are not directly comparable because they include only the 100 surviving tasks; the other 400 tasks failed rather than waiting to completion. FIFO's higher reported throughput is likewise completed-task throughput over a much shorter failure-dominated run.
 
 The age-360 result demonstrates that a larger aging threshold enables substantial backfill at N=16, but the end-to-end gain is modest. Backfill improves queue utilization while causing more cache eviction and recomputation, limiting its throughput and latency benefit.
+
+## Common FIFO-success task subset
+
+Restricting all policies to the exact 100 task IDs that succeeded under FIFO controls for task identity but not system load. FIFO p50/p95 are 126.7/269.6 seconds, age 30 is 3,159.0/5,395.6 seconds, and age 360 is 2,858.6/5,355.1 seconds. Median accumulated ready-queue time is 97.4 seconds for FIFO, 3,135.6 seconds for age 30, and 2,822.5 seconds for age 360. FIFO remains artificially lightly loaded because the other 400 tasks fail and leave the system, whereas both Phase 2 runs retain all 500 tasks until completion.
+
+The active-concurrency timeline is stored in `r5_aging_running_concurrency_over_time.png`. Its one-second time-weighted means are 5.54 running requests for age 30 and 5.60 for age 360, despite the configured maximum N=16. KV-safe admission, rather than the slot maximum, controls effective concurrency.
