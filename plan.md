@@ -667,10 +667,12 @@ The run uses AgentTrace seed 2, 500 tasks, N=4, Poisson arrival rate 0.5 tasks/s
 ### Approved todos
 
 - [x] Add and test a uniquely named R4 cost-aware configuration.
-- [ ] Deploy the validated configuration and start it detached.
-- [ ] Preserve complete raw artifacts and logs on the instance.
-- [ ] Upload results to GitHub if an authenticated remote path is available.
-- [ ] Stop—not terminate—the instance after execution using a verified safe control path.
-- [ ] Compare against the Phase 1 R4 FIFO result after artifacts are available.
+- [x] Deploy the validated configuration and start it detached.
+- [x] Preserve complete raw artifacts and logs on the instance.
+- [x] Upload results to GitHub after retrieval through the authenticated local checkout.
+- [x] Stop—not terminate—the instance after execution using a verified safe control path.
+- [x] Compare against the Phase 1 R4 FIFO result after artifacts are available.
 
 The user explicitly approved the full run, GitHub result publication, and stopping the instance after completion on 2026-11-22.
+
+The run completed 500/500 tasks with no KV-context errors at 4.200 tasks/min. Relative to FIFO R4, it eliminated 28 failures, retained 98.6% of throughput, and improved p50 by 12.2%, but p95 increased by 16.2%. The detached archive-and-shutdown supervisor completed with status zero and successfully stopped the instance.

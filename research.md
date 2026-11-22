@@ -89,6 +89,8 @@ R4 is the strongest Phase 1 headline comparison for the cost-aware scheduler: N=
 
 The approved EC2 workspace is not a Git checkout, has no GitHub credential/deploy key, and has no IAM instance role. It can run independently and preserve results on its EBS volume, but cannot push to GitHub or invoke the EC2 StopInstances API without additional credentials. Passwordless OS shutdown is available; instance-initiated shutdown must only be used when its EC2 behavior is known to be stop rather than terminate.
 
+The unattended supervisor pattern was validated by the full R4 run: launch with `nohup`, stream a dedicated supervisor log, archive the output group, call `sync`, and schedule `sudo shutdown -h +1` only after the benchmark and archive complete. The instance stopped rather than terminating and retained its EBS artifacts across restart. Reuse this pattern for later long runs on this instance.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.
