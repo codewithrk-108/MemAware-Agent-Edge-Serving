@@ -99,6 +99,12 @@ The age-30 host reuses the validated R4 workspace. The age-360 host has the same
 
 Both R5 policies completed 500/500 tasks with zero KV-context failures. Raising aging from 30 to 360 increased backfills from 38 to 135, reduced average queue length from 222.0 to 207.0, and improved p50/p95 by 4.5%/1.8%. It also reduced cache-hit ratio from 45.8% to 44.1% and increased recomputed prompt tokens 4.8%, explaining why the large increase in backfill produced only modest end-to-end gains.
 
+### Physical-reconciled admission follow-up
+
+The current logical calculation already subtracts a returning task's retained idle cache before adding its full predicted footprint, so merely subtracting the resident prefix again would be unsafe double-subtraction. Output-budget calibration also offers no gain on this trace: all 1,068 requests in each full run generated exactly their requested token budget.
+
+The actual opportunity is reconciliation with fresh physical occupancy. In R5 age 30, 3,013 of 3,471 blocked decisions occurred below 80% measured KV use and 2,089 occurred below 70%; median physical occupancy at a block was 67.2%. A safe physical-reconciled projection starts from a fresh synchronous physical sample, then adds worst-case remaining incremental growth for active requests, incremental growth for the candidate, tool-return reserve, and the existing safety margin. A retained prefix is recognized only when explicit slot ownership and resident-cell accounting agree. Missing or stale physical data must fall back to the current logical projection.
+
 ## Two-queue implementation findings
 
 - `RunnableFifo.take()` removes work before admission is decided, and each Phase 1 worker independently computes its diagnostic reservation. A predictive policy cannot safely reuse that control flow: two workers could observe the same capacity and both admit. Phase 2 therefore needs one condition-backed dispatcher that owns queue selection and active reservations atomically, while request execution remains concurrent in separate jobs.

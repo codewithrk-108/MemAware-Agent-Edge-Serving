@@ -58,6 +58,7 @@ def main() -> None:
                                              "cost-aware-r4",
                                              "cost-aware-r5-age30",
                                              "cost-aware-r5-age360",
+                                             "physical-cost-aware-poisson5",
                                              "both"),
                         default="both")
     parser.add_argument("--trace", default="data/traces/agenttrace_50_seed2.jsonl")
@@ -212,6 +213,19 @@ def main() -> None:
         config.cost_aware_resume = True
         config.resume_queue_cost_weight = 0.25
         summaries["phase2_cost_aware_age30_poisson5s"] = execute_phase2(
+            config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
+
+    if args.policy == "physical-cost-aware-poisson5":
+        run = run_config("smoke_phase2_physical_cost_aware_age30_n4_poisson5s_50",
+                         args.trace, args.n_tasks, args.concurrency, args.ctx,
+                         args.seed, arrival_rate=0.2)
+        config = quota_config(run)
+        config.max_consecutive_resume_priorities = 0
+        config.cost_aware_resume = True
+        config.resume_queue_cost_weight = 0.25
+        config.admission_accounting = "physical_reconciled"
+        config.physical_sample_max_age_s = 0.25
+        summaries["phase2_physical_cost_aware_poisson5s"] = execute_phase2(
             config, RuntimeEstimator.load(args.runtime_model), group=args.output_group)
 
     if args.policy == "cost-aware-r4":

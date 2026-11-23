@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from harness.client import complete, new_session
-from harness.kv_memory import KvMemSampler
+from harness.kv_memory import KvMemSampler, kv_memory_sample
 from harness.memory import GpuMemSampler, MiB
 from harness.results import RESULTS, check_power, environment
 from harness.server import Server, ServerConfig
@@ -59,6 +59,8 @@ class Phase2Config:
     resume_priority_head_age_limit_s: float = 0.0
     cost_aware_resume: bool = False
     resume_queue_cost_weight: float = 0.25
+    admission_accounting: str = "logical"
+    physical_sample_max_age_s: float = 0.25
 
     def scheduler_config(self) -> SchedulerConfig:
         return SchedulerConfig(
@@ -88,6 +90,10 @@ class Phase2Config:
             raise ValueError("resume priority head age limit must be non-negative")
         if self.resume_queue_cost_weight < 0:
             raise ValueError("resume queue cost weight must be non-negative")
+        if self.admission_accounting not in {"logical", "physical_reconciled"}:
+            raise ValueError("admission accounting must be logical or physical_reconciled")
+        if self.physical_sample_max_age_s <= 0:
+            raise ValueError("physical sample maximum age must be positive")
         if self.eviction_policy not in {"none", "slot_aware"}:
             raise ValueError("eviction_policy must be none or slot_aware")
         if self.cache_grace_s and self.eviction_policy != "slot_aware":
@@ -97,6 +103,9 @@ class Phase2Config:
             raise ValueError("resume priority fairness requires cache grace")
         if self.cost_aware_resume and not self.cache_grace_s:
             raise ValueError("cost-aware resume requires cache grace")
+        if (self.admission_accounting == "physical_reconciled"
+                and (self.eviction_policy != "slot_aware" or not self.run.require_kv_metrics)):
+            raise ValueError("physical-reconciled admission requires slot-aware eviction and KV metrics")
 
 
 def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: dict) -> None:
@@ -107,6 +116,7 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
         "estimated_tool_delay_s", "timing_mode", "cache_grace_s",
         "max_consecutive_resume_priorities", "resume_priority_head_age_limit_s",
         "cost_aware_resume", "resume_queue_cost_weight",
+        "admission_accounting", "physical_sample_max_age_s",
     )
     optional_defaults = {
         "cache_grace_s": 0,
@@ -114,6 +124,8 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
         "resume_priority_head_age_limit_s": 0,
         "cost_aware_resume": False,
         "resume_queue_cost_weight": 0.25,
+        "admission_accounting": "logical",
+        "physical_sample_max_age_s": 0.25,
     }
     expected = {field: policy.get(field, optional_defaults.get(field))
                 for field in fields}
@@ -129,7 +141,8 @@ def verify_evaluation_config(cfg: Phase2Config, estimator_path: Path, artifact: 
 def _ready_request(state: RequestTaskState, task, rec: TaskRecord, ready_at: float,
                    sequence: int, estimator: RuntimeEstimator, deadline_s: float,
                    preferred_worker: Optional[int] = None,
-                   resume_priority: bool = False) -> ReadyRequest:
+                   resume_priority: bool = False,
+                   resident_prefix_cells: int = 0) -> ReadyRequest:
     step = task.steps[state.next_step]
     runtime, fallback = estimator.predict(len(state.history), step.n_gen)
     return ReadyRequest(
@@ -144,6 +157,7 @@ def _ready_request(state: RequestTaskState, task, rec: TaskRecord, ready_at: flo
         runtime_fallback=fallback,
         preferred_worker=preferred_worker,
         resume_priority=resume_priority,
+        resident_prefix_cells=resident_prefix_cells,
     )
 
 
@@ -171,6 +185,28 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
     grace_hit_tasks: set[int] = set()
     resume_priority_streak = 0
     pending_resume_priorities = 0
+    latest_physical_sample: Optional[dict] = None
+    physical_sample_errors = 0
+    physical_accounting_fallbacks = 0
+
+    async def fresh_physical_used_cells() -> Optional[int]:
+        nonlocal latest_physical_sample, physical_sample_errors
+        if cfg.admission_accounting != "physical_reconciled":
+            return None
+        now = loop.time()
+        if (latest_physical_sample is not None
+                and now - latest_physical_sample["t"] <= cfg.physical_sample_max_age_s):
+            return latest_physical_sample["used_cells"]
+        try:
+            sample = await asyncio.to_thread(kv_memory_sample, srv.url, 1.0)
+            if sample["capacity_cells"] != cfg.run.server.ctx:
+                raise ValueError("physical KV capacity differs from configured context")
+            latest_physical_sample = sample
+            return sample["used_cells"]
+        except (OSError, ValueError):
+            latest_physical_sample = None
+            physical_sample_errors += 1
+            return None
 
     def finish(state: RequestTaskState, status: str, error: Optional[str] = None) -> bool:
         nonlocal completed
@@ -253,6 +289,9 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                 grace_hit_tasks.add(state.task_index)
             scheduler.clear_tool_waiting(state.task_index)
             step = tasks[state.task_index].steps[state.next_step]
+            resident_prefix_cells = 0
+            if slot_manager is not None and slot_manager.preferred_slot(state.task_index) is not None:
+                resident_prefix_cells = slot_manager.resident_cells_by_task.get(state.task_index, 0)
             state.history = state.history + step.input
             now = loop.time()
             state.enqueued_at = state.runnable_at = now
@@ -272,6 +311,7 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                 state, tasks[state.task_index], rec, now, enqueue_sequence,
                 estimator, cfg.run.deadline_s,
                 slot_manager.preferred_slot(state.task_index) if slot_manager else None,
+                resident_prefix_cells=resident_prefix_cells,
             )
             score = benefit = cost = None
             cost_blocked = False
@@ -457,6 +497,10 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
 
                 dispatched = False
                 while scheduler.entries and scheduler.free_workers:
+                    physical_used_cells = await fresh_physical_used_cells()
+                    if (cfg.admission_accounting == "physical_reconciled"
+                            and physical_used_cells is None):
+                        physical_accounting_fallbacks += 1
                     protected_slots: set[int] = set()
                     if slot_manager:
                         current = loop.time()
@@ -472,7 +516,8 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                                    if slot_manager.owner(slot) is None]
                         needs_slot = preferred not in scheduler.free_workers and not unowned
                         over_capacity = (
-                            scheduler.projected_used_cells(head, loop.time())
+                            scheduler.projected_used_cells(
+                                head, loop.time(), physical_used_cells)
                             > scheduler.config.capacity_cells
                         )
                         if needs_slot or over_capacity:
@@ -511,7 +556,8 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
                                 options.add(preferred)
                             worker_options[entry.task_index] = options
                     selection, decision = scheduler.select(
-                        loop.time(), eligible_workers, worker_options)
+                        loop.time(), eligible_workers, worker_options,
+                        physical_used_cells=physical_used_cells)
                     if decision:
                         decision["scheduler_overhead_s"] = time.perf_counter() - decision_started
                         decision["t"] -= t0
@@ -599,6 +645,13 @@ def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFr
         "resume_priority_head_age_limit_s": cfg.resume_priority_head_age_limit_s,
         "cost_aware_resume": cfg.cost_aware_resume,
         "resume_queue_cost_weight": cfg.resume_queue_cost_weight,
+        "admission_accounting": cfg.admission_accounting,
+        "physical_sample_max_age_s": cfg.physical_sample_max_age_s,
+        "physical_sample_errors": physical_sample_errors,
+        "physical_accounting_fallbacks": physical_accounting_fallbacks,
+        "physical_reconciled_decisions": int(
+            pd.Series([row.get("admission_accounting") for row in decisions], dtype=str)
+            .eq("physical_reconciled").sum()),
         "adaptive_grace_holds": int((reasons == "adaptive_grace_hold").sum()),
         "cache_grace_returns": int(requests.get(
             "cache_grace_return", pd.Series(dtype=bool)).fillna(False).sum()),
@@ -707,6 +760,9 @@ def main() -> None:
     parser.add_argument("--resume-priority-head-age-limit", type=float, default=0.0)
     parser.add_argument("--cost-aware-resume", action="store_true")
     parser.add_argument("--resume-queue-cost-weight", type=float, default=0.25)
+    parser.add_argument("--admission-accounting",
+                        choices=("logical", "physical_reconciled"), default="logical")
+    parser.add_argument("--physical-sample-max-age", type=float, default=0.25)
     parser.add_argument("--deadline", type=float, default=21600)
     parser.add_argument("--request-timeout", type=float, default=1800)
     parser.add_argument("--seed", type=int, default=2)
@@ -734,6 +790,8 @@ def main() -> None:
         resume_priority_head_age_limit_s=args.resume_priority_head_age_limit,
         cost_aware_resume=args.cost_aware_resume,
         resume_queue_cost_weight=args.resume_queue_cost_weight,
+        admission_accounting=args.admission_accounting,
+        physical_sample_max_age_s=args.physical_sample_max_age,
     )
     estimator = RuntimeEstimator.load(args.runtime_model)
     config.validate()

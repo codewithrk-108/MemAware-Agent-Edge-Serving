@@ -46,10 +46,15 @@ class ReadyRequest:
     bypass_count: int = 0
     preferred_worker: Optional[int] = None
     resume_priority: bool = False
+    resident_prefix_cells: int = 0
 
     @property
     def predicted_kv_cells(self) -> int:
         return self.prompt_tokens + self.output_budget_tokens
+
+    @property
+    def incremental_growth_cells(self) -> int:
+        return max(0, self.prompt_tokens - self.resident_prefix_cells) + self.output_budget_tokens
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,7 @@ class ActiveReservation:
     task_index: int
     step_index: int
     reserved_kv_cells: int
+    growth_reserve_cells: int
     admitted_at: float
 
 
@@ -86,6 +92,10 @@ class TwoQueueScheduler:
     def active_reserved_cells(self) -> int:
         return sum(reservation.reserved_kv_cells for reservation in self.active.values())
 
+    @property
+    def active_growth_reserve_cells(self) -> int:
+        return sum(reservation.growth_reserve_cells for reservation in self.active.values())
+
     def tool_return_reserve_cells(self, now: float) -> int:
         waiting = sum(
             predicted_return is None or self.config.reserve_horizon_s == 0
@@ -101,13 +111,24 @@ class TwoQueueScheduler:
     def idle_cache_cells(self) -> int:
         return sum(self.idle_cache_cells_by_task.values())
 
-    def projected_used_cells(self, request: ReadyRequest, now: float) -> int:
+    def projected_used_cells(self, request: ReadyRequest, now: float,
+                             physical_used_cells: Optional[int] = None) -> int:
+        if physical_used_cells is not None:
+            return (physical_used_cells + self.active_growth_reserve_cells
+                    + request.incremental_growth_cells + self.tool_return_reserve_cells(now)
+                    + self.config.safety_margin_cells)
         own_idle = self.idle_cache_cells_by_task.get(request.task_index, 0)
         return (self.active_reserved_cells + self.idle_cache_cells - own_idle
                 + request.predicted_kv_cells + self.tool_return_reserve_cells(now)
                 + self.config.safety_margin_cells)
 
-    def effective_available_cells(self, request: ReadyRequest, now: float) -> int:
+    def effective_available_cells(self, request: ReadyRequest, now: float,
+                                  physical_used_cells: Optional[int] = None) -> int:
+        if physical_used_cells is not None:
+            return max(0, self.config.capacity_cells - physical_used_cells
+                       - self.active_growth_reserve_cells
+                       - self.tool_return_reserve_cells(now)
+                       - self.config.safety_margin_cells)
         own_idle = self.idle_cache_cells_by_task.get(request.task_index, 0)
         return max(0, self.config.capacity_cells - self.active_reserved_cells
                    - self.idle_cache_cells + own_idle - self.tool_return_reserve_cells(now)
@@ -162,12 +183,15 @@ class TwoQueueScheduler:
     def infeasible(self, request: ReadyRequest) -> bool:
         return request.predicted_kv_cells + self.config.safety_margin_cells > self.config.capacity_cells
 
-    def _fits(self, request: ReadyRequest, now: float) -> bool:
-        return self.projected_used_cells(request, now) <= self.config.capacity_cells
+    def _fits(self, request: ReadyRequest, now: float,
+              physical_used_cells: Optional[int] = None) -> bool:
+        return self.projected_used_cells(
+            request, now, physical_used_cells) <= self.config.capacity_cells
 
     def _decision(self, now: float, head: ReadyRequest, selected: Optional[ReadyRequest],
                   worker: Optional[int], reason: str, candidate_count: int = 0,
-                  allowance_s: Optional[float] = None) -> dict:
+                  allowance_s: Optional[float] = None,
+                  physical_used_cells: Optional[int] = None) -> dict:
         self.decision_sequence += 1
         return {
             "decision_sequence": self.decision_sequence,
@@ -184,31 +208,44 @@ class TwoQueueScheduler:
             "head_age_s": max(0.0, now - head.ready_at),
             "head_bypass_count": head.bypass_count,
             "head_need_cells": head.predicted_kv_cells,
+            "head_incremental_growth_cells": head.incremental_growth_cells,
+            "head_resident_prefix_cells": head.resident_prefix_cells,
             "selected_need_cells": selected.predicted_kv_cells if selected else None,
+            "selected_incremental_growth_cells": (
+                selected.incremental_growth_cells if selected else None),
+            "selected_resident_prefix_cells": selected.resident_prefix_cells if selected else None,
             "selected_predicted_runtime_s": selected.predicted_runtime_s if selected else None,
             "runtime_fallback": selected.runtime_fallback if selected else None,
             "active_reserved_cells": self.active_reserved_cells,
+            "active_growth_reserve_cells": self.active_growth_reserve_cells,
             "idle_cache_cells": self.idle_cache_cells,
             "tool_return_reserve_cells": self.tool_return_reserve_cells(now),
             "safety_margin_cells": self.config.safety_margin_cells,
-            "effective_available_cells": self.effective_available_cells(head, now),
-            "projected_used_cells": self.projected_used_cells(selected or head, now),
+            "physical_used_cells_at_decision": physical_used_cells,
+            "admission_accounting": "physical_reconciled" if physical_used_cells is not None else "logical",
+            "effective_available_cells": self.effective_available_cells(
+                head, now, physical_used_cells),
+            "projected_used_cells": self.projected_used_cells(
+                selected or head, now, physical_used_cells),
             "candidate_count": candidate_count,
             "backfill_allowance_s": allowance_s,
         }
 
     def select(self, now: float, eligible_workers: Optional[set[int]] = None,
-               worker_options: Optional[dict[int, set[int]]] = None
+               worker_options: Optional[dict[int, set[int]]] = None,
+               physical_used_cells: Optional[int] = None,
                ) -> tuple[Optional[Selection], Optional[dict]]:
         workers = self.free_workers if eligible_workers is None else self.free_workers & eligible_workers
         if not self.entries or not workers:
             return None, None
         head = self.entries[0]
         head_workers = self._workers_for(head, workers, worker_options)
-        if self._fits(head, now) and head_workers:
+        if self._fits(head, now, physical_used_cells) and head_workers:
             selected = self.entries.pop(0)
             worker = self._worker_for(selected, head_workers)
-            decision = self._decision(now, head, selected, worker, "fifo_head")
+            decision = self._decision(
+                now, head, selected, worker, "fifo_head",
+                physical_used_cells=physical_used_cells)
             return self._reserve(selected, worker, now, "fifo_head", decision), decision
 
         head_age = max(0.0, now - head.ready_at)
@@ -216,7 +253,7 @@ class TwoQueueScheduler:
         candidates = []
         if allowance > 0:
             candidates = [entry for entry in self.entries[1:]
-                          if self._fits(entry, now)
+                          if self._fits(entry, now, physical_used_cells)
                           and self._workers_for(entry, workers, worker_options)
                           and entry.predicted_runtime_s <= allowance
                           and now + entry.predicted_runtime_s < entry.deadline_at]
@@ -227,12 +264,14 @@ class TwoQueueScheduler:
                 selected, self._workers_for(selected, workers, worker_options))
             head.bypass_count += 1
             decision = self._decision(now, head, selected, worker, "backfill",
-                                      candidate_count=len(candidates), allowance_s=allowance)
+                                      candidate_count=len(candidates), allowance_s=allowance,
+                                      physical_used_cells=physical_used_cells)
             return self._reserve(selected, worker, now, "backfill", decision), decision
 
         reason = "aged_head_blocked" if head_age >= self.config.aging_threshold_s else "head_blocked"
         decision = self._decision(now, head, None, None, reason,
-                                  candidate_count=len(candidates), allowance_s=max(0.0, allowance))
+                                  candidate_count=len(candidates), allowance_s=max(0.0, allowance),
+                                  physical_used_cells=physical_used_cells)
         return None, decision
 
     def _worker_for(self, request: ReadyRequest, workers: set[int]) -> int:
@@ -256,6 +295,7 @@ class TwoQueueScheduler:
             task_index=request.task_index,
             step_index=request.step_index,
             reserved_kv_cells=request.predicted_kv_cells,
+            growth_reserve_cells=request.incremental_growth_cells,
             admitted_at=now,
         )
         return Selection(request=request, worker=worker, reason=reason, decision=decision)

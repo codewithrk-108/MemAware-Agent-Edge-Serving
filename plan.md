@@ -696,3 +696,24 @@ Both runs use the 500-task AgentTrace seed-2 trace, N=16, Poisson arrival rate 0
 The user explicitly approved both parallel R5 runs, artifact handling, and post-run instance stopping on 2026-11-22.
 
 Both runs completed 500/500 tasks without KV-context errors. Aging 360 admitted 135 backfills versus 38 at aging 30 and modestly improved throughput, p50, p95, queue length, and average running concurrency, while increasing cache recomputation. Complete raw artifacts, supervisor logs, and checksum-verified archives were retrieved for publication.
+
+## Physical-KV-reconciled admission smoke
+
+I want to build a physical-reconciled admission mode that extends cost-aware scheduling to admit against fresh measured KV occupancy plus conservative remaining growth, reducing false logical blocks without sacrificing the zero-failure property.
+
+`ReadyRequest` will record a verified resident prefix and expose incremental growth as `prompt - resident + maximum output`. Active reservations retain both full-footprint accounting for legacy logical mode and incremental-growth accounting for physical mode. The dispatcher will obtain a fresh `/metrics` KV sample with a short maximum age; physical projection is `physical used + active remaining growth + candidate incremental growth + tool reserve + safety margin`. Sampling errors or stale data use the existing logical calculation. Decision logs identify accounting mode, physical baseline, resident prefix, incremental need, and fallback count.
+
+The matched smoke uses the existing 50-task AgentTrace Poisson-5s workload, seed 2, N=4, 32K KV, aging 30, cost-aware resume, 500 ms grace, and queue-cost weight 0.25. It differs from `smoke_phase2_cost_aware_age30_n4_poisson5s_50` only in admission accounting. Compare success, KV errors, throughput, p50/p95, queue length, average/peak KV, active concurrency, cache reuse, recomputation, backfills, and physical-accounting fallbacks.
+
+### Approved todos
+
+- [x] Confirm the current retained-prefix subtraction and quantify false logical blocks.
+- [x] Specify conservative physical projection and fallback semantics.
+- [x] Add request/reservation incremental-growth fields and scheduler tests.
+- [x] Add fresh physical-sample integration, telemetry, and fallback tests.
+- [x] Add a uniquely named matched smoke configuration.
+- [x] Run the complete local suite (`111 passed, 1 skipped`).
+- [ ] Deploy and run the matched T4 smoke test.
+- [ ] Retrieve, compare, document, commit, and push the result.
+
+The user explicitly approved implementation and the smoke test on 2026-11-22.
