@@ -607,7 +607,11 @@ async def run_phase2(cfg: Phase2Config, srv, tasks: list, offsets,
             await asyncio.gather(*request_jobs)
         if tool_jobs:
             await asyncio.gather(*tool_jobs)
-    return recs, requests, timeline, decisions, evictions, t0
+    diagnostics = {
+        "physical_sample_errors": physical_sample_errors,
+        "physical_accounting_fallbacks": physical_accounting_fallbacks,
+    }
+    return recs, requests, timeline, decisions, evictions, t0, diagnostics
 
 
 def _task_frame(recs: list[TaskRecord], t0: float) -> pd.DataFrame:
@@ -622,7 +626,8 @@ def _task_frame(recs: list[TaskRecord], t0: float) -> pd.DataFrame:
 
 def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFrame,
                      memory: pd.DataFrame, metrics: dict, decisions: list[dict],
-                     evictions: list[dict]) -> dict:
+                     evictions: list[dict], diagnostics: Optional[dict] = None) -> dict:
+    diagnostics = diagnostics or {}
     summary = summarize(cfg.run, tasks, requests, memory, metrics, [])
     summary["scheduler"] = "phase2_two_queue"
     reasons = pd.Series([row["reason"] for row in decisions], dtype=str)
@@ -647,8 +652,8 @@ def summarize_phase2(cfg: Phase2Config, tasks: pd.DataFrame, requests: pd.DataFr
         "resume_queue_cost_weight": cfg.resume_queue_cost_weight,
         "admission_accounting": cfg.admission_accounting,
         "physical_sample_max_age_s": cfg.physical_sample_max_age_s,
-        "physical_sample_errors": physical_sample_errors,
-        "physical_accounting_fallbacks": physical_accounting_fallbacks,
+        "physical_sample_errors": diagnostics.get("physical_sample_errors", 0),
+        "physical_accounting_fallbacks": diagnostics.get("physical_accounting_fallbacks", 0),
         "physical_reconciled_decisions": int(
             pd.Series([row.get("admission_accounting") for row in decisions], dtype=str)
             .eq("physical_reconciled").sum()),
@@ -697,7 +702,7 @@ def execute(cfg: Phase2Config, estimator: RuntimeEstimator, group: str = "phase2
         with KvMemSampler(srv.url) as kv:
             if cfg.run.require_kv_metrics and not kv.samples:
                 raise RuntimeError(kv.error or "physical KV occupancy metrics unavailable")
-            recs, request_rows, timeline, decisions, evictions, t0 = asyncio.run(
+            recs, request_rows, timeline, decisions, evictions, t0, diagnostics = asyncio.run(
                 run_phase2(cfg, srv, tasks_to_run, offsets, estimator))
         metrics = srv.metrics()
         memory = pd.DataFrame([
@@ -708,7 +713,8 @@ def execute(cfg: Phase2Config, estimator: RuntimeEstimator, group: str = "phase2
 
     tasks = _task_frame(recs, t0)
     requests = pd.DataFrame(request_rows).drop(columns=["tokens"], errors="ignore")
-    summary = summarize_phase2(cfg, tasks, requests, memory, metrics, decisions, evictions)
+    summary = summarize_phase2(
+        cfg, tasks, requests, memory, metrics, decisions, evictions, diagnostics)
     summary.update(kv.summary())
     gpu_rows = [{**sample, "t": sample["t"] - t0} for sample in gpu.samples]
     summary.update({
