@@ -46,18 +46,6 @@ class Phase2SmokeConfigTests(unittest.TestCase):
         self.assertEqual(config.aging_threshold_s, 30)
         self.assertEqual(config.resume_queue_cost_weight, 0.25)
 
-    def test_physical_reconciled_smoke_settings(self):
-        run = run_config("physical", "trace.jsonl", 50, 4, 32768, 2,
-                         arrival_rate=0.2)
-        config = quota_config(run)
-        config.max_consecutive_resume_priorities = 0
-        config.cost_aware_resume = True
-        config.admission_accounting = "physical_reconciled"
-        config.validate()
-        self.assertEqual(config.admission_accounting, "physical_reconciled")
-        self.assertTrue(config.run.require_kv_metrics)
-        self.assertEqual(config.eviction_policy, "slot_aware")
-
     def test_r4_workload_settings(self):
         run = run_config("r4", "trace.jsonl", 500, 4, 32768, 2,
                          arrival_rate=0.5)

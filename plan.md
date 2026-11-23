@@ -696,7 +696,6 @@ Both runs use the 500-task AgentTrace seed-2 trace, N=16, Poisson arrival rate 0
 The user explicitly approved both parallel R5 runs, artifact handling, and post-run instance stopping on 2026-11-22.
 
 Both runs completed 500/500 tasks without KV-context errors. Aging 360 admitted 135 backfills versus 38 at aging 30 and modestly improved throughput, p50, p95, queue length, and average running concurrency, while increasing cache recomputation. Complete raw artifacts, supervisor logs, and checksum-verified archives were retrieved for publication.
-
 ## Physical-KV-reconciled admission smoke
 
 I want to build a physical-reconciled admission mode that extends cost-aware scheduling to admit against fresh measured KV occupancy plus conservative remaining growth, reducing false logical blocks without sacrificing the zero-failure property.

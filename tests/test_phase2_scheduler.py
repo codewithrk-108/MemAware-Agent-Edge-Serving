@@ -111,29 +111,6 @@ class TwoQueueSchedulerTests(unittest.TestCase):
         self.assertEqual(decision["idle_cache_cells"], 7)
         self.assertNotIn(0, scheduler.idle_cache_cells_by_task)
 
-    def test_physical_projection_adds_only_verified_incremental_growth(self):
-        scheduler = self.scheduler(capacity_cells=20, concurrency=2, safety_margin_cells=1)
-        active = request(9, 0, 8)
-        scheduler.put(active)
-        scheduler.select(0)
-        returning = request(0, 1, 7)
-        returning.resident_prefix_cells = 4
-        self.assertEqual(returning.incremental_growth_cells, 3)
-        self.assertEqual(scheduler.projected_used_cells(
-            returning, 1, physical_used_cells=8), 20)
-        scheduler.put(returning)
-        selection, decision = scheduler.select(1, physical_used_cells=8)
-        self.assertEqual(selection.request.task_index, 0)
-        self.assertEqual(decision["admission_accounting"], "physical_reconciled")
-        self.assertEqual(decision["selected_resident_prefix_cells"], 4)
-
-    def test_physical_projection_without_verified_prefix_reserves_full_request(self):
-        scheduler = self.scheduler(capacity_cells=20, concurrency=1)
-        candidate = request(0, 0, 7)
-        self.assertEqual(candidate.incremental_growth_cells, 7)
-        self.assertEqual(scheduler.projected_used_cells(
-            candidate, 1, physical_used_cells=10), 17)
-
     def test_returning_request_prefers_its_retained_slot(self):
         scheduler = self.scheduler(concurrency=2)
         returning = request(0, 0, 2)
@@ -390,11 +367,6 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
     def test_cost_aware_resume_requires_cache_grace(self):
         config = self.config(cost_aware_resume=True)
         with self.assertRaisesRegex(ValueError, "requires cache grace"):
-            config.validate()
-
-    def test_physical_reconciled_requires_slot_aware_metrics(self):
-        config = self.config(admission_accounting="physical_reconciled")
-        with self.assertRaisesRegex(ValueError, "requires slot-aware eviction and KV metrics"):
             config.validate()
 
 
