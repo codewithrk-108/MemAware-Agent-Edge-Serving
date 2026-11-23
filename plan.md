@@ -718,4 +718,4 @@ The matched smoke uses the existing 50-task AgentTrace Poisson-5s workload, seed
 
 The user explicitly approved implementation and the smoke test on 2026-11-22.
 
-The valid run completed 50/50 with zero KV errors, physical sample errors, or logical fallbacks. It regressed throughput and latency because the conservative active-growth reserve double-counted growth already visible in physical occupancy. The mode remains opt-in; the default logical policy is unchanged. This result should be treated as a negative ablation, not promoted to the headline algorithm.
+The valid run completed 50/50 with zero KV errors, physical sample errors, or logical fallbacks. It regressed throughput and latency because the conservative active-growth reserve double-counted growth already visible in physical occupancy. The experimental mode was subsequently reverted; the logical cost-aware policy is again the only active implementation. The artifacts remain as a negative ablation.
