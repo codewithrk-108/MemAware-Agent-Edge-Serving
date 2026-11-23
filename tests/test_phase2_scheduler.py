@@ -259,7 +259,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
     async def test_runner_preserves_fifo_when_requests_fit(self):
         tasks = [self.make_task("a", 10), self.make_task("b", 20)]
         fake = FakeComplete()
-        recs, requests, _, decisions, _, _, _ = await run_phase2(
+        recs, requests, _, decisions, _, _ = await run_phase2(
             self.config(), SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake)
         self.assertEqual(fake.calls, [10, 20])
@@ -271,7 +271,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
     async def test_runner_requeues_after_tool_wait(self):
         tasks = [self.make_task("a", 10, steps=2, delay=0.01), self.make_task("b", 20)]
         fake = FakeComplete()
-        recs, _, timeline, _, _, _, _ = await run_phase2(
+        recs, _, timeline, _, _, _ = await run_phase2(
             self.config(), SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake)
         self.assertEqual(fake.calls, [10, 20, 10])
@@ -281,7 +281,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
     async def test_runner_marks_infeasible_without_calling_server(self):
         tasks = [Task("large", "test", "test", [Step([10] * 20, 1, None)])]
         fake = FakeComplete()
-        recs, _, _, _, _, _, _ = await run_phase2(
+        recs, _, _, _, _, _ = await run_phase2(
             self.config(ctx=10), SimpleNamespace(url="http://test"), tasks, np.zeros(1),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake)
         self.assertEqual(fake.calls, [])
@@ -297,7 +297,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(slot_id, active_slots)
             return EvictionResult(slot_id, 100, 50)
 
-        recs, requests, _, _, evictions, _, _ = await run_phase2(
+        recs, requests, _, _, evictions, _ = await run_phase2(
             config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
         self.assertEqual(fake.calls, [10, 20, 10])
@@ -317,7 +317,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(slot_id, active_slots)
             return EvictionResult(slot_id, 100, 50)
 
-        recs, requests, _, decisions, evictions, _, _ = await run_phase2(
+        recs, requests, _, decisions, evictions, _ = await run_phase2(
             config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
         self.assertTrue(all(record.status == "ok" for record in recs))
@@ -340,7 +340,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
         def fake_erase(url, slot_id, active_slots):
             return EvictionResult(slot_id, 100, 50)
 
-        recs, requests, _, decisions, evictions, _, _ = await run_phase2(
+        recs, requests, _, decisions, evictions, _ = await run_phase2(
             config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
         self.assertTrue(all(record.status == "ok" for record in recs))
@@ -363,7 +363,7 @@ class Phase2RunnerTests(unittest.IsolatedAsyncioTestCase):
         def fake_erase(url, slot_id, active_slots):
             return EvictionResult(slot_id, 100, 50)
 
-        recs, requests, _, decisions, _, _, _ = await run_phase2(
+        recs, requests, _, decisions, _, _ = await run_phase2(
             config, SimpleNamespace(url="http://test"), tasks, np.zeros(2),
             RuntimeEstimator(0.001, 0, 0, 0.001), fake, fake_erase)
         self.assertTrue(all(record.status == "ok" for record in recs))
