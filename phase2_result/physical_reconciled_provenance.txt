@@ -1,0 +1,17 @@
+date=2026-11-22
+host=ip-172-31-46-52.us-west-2.compute.internal
+public_ip=44.249.57.170
+workspace=/home/ec2-user/phase2-smoke-v1
+experiment=physical-reconciled-cost-aware-poisson5s-smoke
+n_tasks=50
+concurrency=4
+arrival_rate=0.2
+ctx=32768
+seed=2
+aging_threshold_s=30
+cache_grace_s=0.5
+admission_accounting=physical_reconciled
+physical_sample_max_age_s=0.25
+physical_sample_errors=0
+physical_accounting_fallbacks=0
+notes=First inference-complete attempt failed during summary serialization and is excluded; committed artifacts are from the corrected clean rerun.

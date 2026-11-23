@@ -713,7 +713,10 @@ The matched smoke uses the existing 50-task AgentTrace Poisson-5s workload, seed
 - [x] Add fresh physical-sample integration, telemetry, and fallback tests.
 - [x] Add a uniquely named matched smoke configuration.
 - [x] Run the complete local suite (`111 passed, 1 skipped`).
-- [ ] Deploy and run the matched T4 smoke test.
-- [ ] Retrieve, compare, document, commit, and push the result.
+- [x] Deploy and run the matched T4 smoke test.
+- [x] Retrieve and compare the valid corrected rerun.
+- [x] Commit and push the result artifacts and negative finding.
 
 The user explicitly approved implementation and the smoke test on 2026-11-22.
+
+The valid run completed 50/50 with zero KV errors, physical sample errors, or logical fallbacks. It regressed throughput and latency because the conservative active-growth reserve double-counted growth already visible in physical occupancy. The mode remains opt-in; the default logical policy is unchanged. This result should be treated as a negative ablation, not promoted to the headline algorithm.
