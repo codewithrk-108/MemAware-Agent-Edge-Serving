@@ -1,0 +1,21 @@
+{
+  "env": {
+    "timestamp": "2026-11-18T00:37:12",
+    "machine": "x86_64",
+    "power": "unknown",
+    "memory_gib": 15.4,
+    "os": "Linux 6.12.111-136.204.amzn2023.x86_64",
+    "llama_cpp_commit": "",
+    "model": "Qwen3-0.6B-Q8_0.gguf",
+    "model_bytes": 639446688
+  },
+  "args": {
+    "reps": 3,
+    "gen": 256,
+    "seed": 2,
+    "port": 8096,
+    "out": "/home/ec2-user/rohan/MemAware-Agent-Edge-Serving/experiments/idle_kv_microbench/data"
+  },
+  "server_args": "/home/ec2-user/bin/llama-server-kv -m /home/ec2-user/Qwen3-0.6B-Q8_0.gguf -c 32768 -np 16 --port 8096 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none --slot-save-path /tmp/idlekv-xgi24il_",
+  "doc": "Microbenchmark: does idle KV in llama.cpp's unified pool slow down decoding of other requests?\n\nMotivation: across the 50-task smoke runs, time per output token rose with mean KV occupancy\n(baseline 50% -> 16.3 ms, experiment 2 57% -> 19.8 ms, experiment 3 80% -> 23.0 ms). If idle cells slow attention\nfor everyone, idle-KV management is about speed, not only memory.\n\nFor each configuration:\n  1. erase all 16 slots (empty pool)\n  2. place X idle cells: slots 4..15 each prefill up to 4,096 random tokens (n_predict 1) and then sit idle\n  3. B active requests (slots 0..B-1), each with a P-token random prompt, decode 256 tokens concurrently\n     (greedy, ignore_eos); record time per output token (client-side, stream inter-token) and the server's own\nOrder of steps 2 and 3:\n  idle_first    idle cells are written first, so the active requests' cells sit after them in the pool\n  active_first  the active prompts are prefilled first (n_predict 1), then the idle cells are written, then the active\n                requests decode (their prompt is reused from cache), so idle cells sit after the active prompts\nComparing the two separates \"how many cells are occupied\" from \"where they sit\".\n\nServer: Phase 1 settings (Qwen3-0.6B Q8_0, f16 KV, -c 32768 -kvu, --cache-ram 0, no mmap) with -np 16, as in\nexperiments 1-3. Configurations whose total cells would exceed 31,744 (32K minus a 1,024-cell margin) are skipped.\nEach configuration is repeated --reps times; configurations run in a seeded random order.\n"
+}

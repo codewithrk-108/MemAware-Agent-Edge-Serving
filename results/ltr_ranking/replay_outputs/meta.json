@@ -1,0 +1,9 @@
+{
+  "trace": "data/traces/agenttrace_50_seed2.jsonl",
+  "n_tasks": 50,
+  "n_requests": 113,
+  "wall_s": 120.24918341636658,
+  "retries": [],
+  "server_args": "/home/ec2-user/bin/llama-server-kv -m /home/ec2-user/Qwen3-0.6B-Q8_0.gguf -c 32768 -np 4 --port 8090 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none --slot-save-path /dev/shm",
+  "doc": "Replay the 50-task smoke trace on llama.cpp and record the tokens the server generates at every step.\n\nWhy: the trace keeps only the length of each earlier model output, not its text, so a length predictor evaluated\non the trace alone never sees the model's previous reasoning and tool call (name, code, command). At serving time a\nscheduler does see them: they are our own server's outputs in the request history. This replay produces them.\n\nSame generation as every experiment: Qwen3-0.6B Q8_0, f16 KV, unified 32K pool (-kvu, -c 32768), --cache-ram 0, no\nmmap, greedy (temperature 0), ignore_eos, each step generates exactly its recorded n_gen tokens, history = previous\nhistory + generated tokens + next step's input (tool result). Tool waits are skipped (they do not change the\ntokens). 4 slots, 4 tasks at a time, each worker pinned to its slot. Greedy output is the same as in the scheduling\nexperiments up to batch-dependent floating-point differences. A step that fails (e.g. \"Context size has been\nexceeded\" when four long histories meet, as in FIFO N4) is retried after erasing its slot, up to 20 times with a\ngrowing pause (5 s x attempt) so that other requests can finish. Finished tasks are appended to\noutputs.partial.jsonl as they complete, and a rerun skips them. (The first two full attempts used 3 immediate\nretries, failed on the same overflow and lost everything because output was written only at the end.)\nOutput: results/ltr_ranking/replay_outputs/outputs.jsonl (one row per step: task_id, step, prompt length, n_gen,\ngenerated token ids), meta.json, server.log.\n"
+}

@@ -1,0 +1,67 @@
+{
+  "checkpoint": "/home/ec2-user/models/ltr/opt-125m-llama3-8b-sharegpt-score-trainbucket10-b32/finetuned",
+  "n_test": 113,
+  "n_calibration": 2283,
+  "mapping_params": {
+    "full_head": {
+      "factor_k": 0.1160888671875,
+      "linear_a": 602.3730625695761,
+      "linear_b": -942.8786622624443,
+      "loglinear_a": 6.404737953073834,
+      "loglinear_b": -0.5563539936146592,
+      "const_median": 951.0
+    },
+    "full_tail": {
+      "factor_k": 0.1160888671875,
+      "linear_a": 597.4060821908762,
+      "linear_b": -938.7618298572776,
+      "loglinear_a": 6.398747753209095,
+      "loglinear_b": -0.5572101200604317,
+      "const_median": 951.0
+    },
+    "user_head": {
+      "factor_k": 0.11613656168639774,
+      "linear_a": 1650.7455251108659,
+      "linear_b": -438.34327109764115,
+      "loglinear_a": 7.029878273035754,
+      "loglinear_b": -0.27464908518769016,
+      "const_median": 951.0
+    }
+  },
+  "score_ms_per_request": {
+    "full_head": {
+      "mean": 17.43612823497519,
+      "p95": 23.302617249953528
+    },
+    "full_tail": {
+      "mean": 17.45077820492477,
+      "p95": 23.366727250049735
+    },
+    "user_head": {
+      "mean": 8.237878032552134,
+      "p95": 8.587591249977322
+    }
+  },
+  "test_pct_truncated_full": 4.424778761061947,
+  "test_n_gen": {
+    "count": 113.0,
+    "mean": 1589.575221238938,
+    "std": 1402.9765984538383,
+    "min": 152.0,
+    "25%": 561.0,
+    "50%": 995.0,
+    "75%": 2095.0,
+    "max": 7471.0
+  },
+  "calib_n_gen": {
+    "count": 2283.0,
+    "mean": 1471.6145422689444,
+    "std": 1459.4177630772656,
+    "min": 34.0,
+    "25%": 523.5,
+    "50%": 951.0,
+    "75%": 1882.5,
+    "max": 14875.0
+  },
+  "doc": "Zero-shot check of the published Learning-to-Rank predictor (Fu et al., NeurIPS 2024) on our workload.\n\nPredictor: LLM-ltr/OPT-Predictors `opt-125m-llama3-8b-sharegpt-score-trainbucket10-b32` (OPT-125M with a 1-output\nsequence-classification head, ListMLE-trained on Llama-3-8B-Instruct output lengths for ShareGPT prompts; label =\n(8192 - length) // 10, so a HIGHER score means a SHORTER predicted output). Used exactly as in vllm-ltr\n(`vllm/model_executor/prefill_predictor.py`): raw prompt text, OPT tokenizer, right truncation at 2,048 tokens,\n`logits` = score. Nothing is fine-tuned here.\n\nRequests: every model request of the AgentTrace pool (data/traces/agenttrace_all_tool_delay_150x_max10s.jsonl).\n  test        = the 113 requests of the 50-task smoke trace (data/traces/agenttrace_50_seed2.jsonl)\n  calibration = all requests of tasks whose original problem (source_task_key) is not in the test set\nThe true output length (`n_gen`) is used only as the target to measure error and, on the calibration set only, to\nfit the score -> tokens mapping (\"factor\"); test lengths are never used for fitting except in the explicitly\nlabelled in-sample row.\n\nPrompt the predictor sees for step k (what a scheduler knows before the request runs, minus earlier model outputs,\nwhich the trace does not record; at serving time they would be our server's own outputs):\n  full_head  served prompt text (system prompt + task + tool results of steps < k, decoded from the trace's Qwen\n             token ids), first 2,048 OPT tokens (paper's truncation)\n  full_tail  same text, last 2,048 OPT tokens (sees the latest tool result)\n  user_head  task text + tool results only (no system prompt / chat template; closer to ShareGPT user prompts),\n             first 2,048 OPT tokens\nMappings score -> predicted tokens (fit on calibration, evaluated on test):\n  const_median   no predictor: median calibration length (baseline)\n  label_inverse  8192 - 10 * score (inverting the training label; score scale is not calibrated by ListMLE)\n  factor         k * label_inverse, k = median(true / label_inverse) on calibration (one multiplicative factor)\n  linear         a + b * score (least squares)\n  loglinear      exp(a + b * score) (least squares on log length; predicts a typical/median length)\n  isotonic       monotone non-increasing step function of score (best monotone calibration)\nRun with /opt/pytorch/bin/python3 and PYTHONPATH=~/ltr_pylib (transformers), see README.\n"
+}

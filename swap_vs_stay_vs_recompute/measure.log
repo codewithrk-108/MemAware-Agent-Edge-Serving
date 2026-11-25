@@ -1,0 +1,345 @@
+113 requests x 3 reps, N4
+rep 999 w0 L   1024 gen    16 prefill    113.6ms save   103.3ms restore    65.5ms reuse 1039 
+rep 999 w1 L   4096 gen    16 prefill    950.7ms save   367.6ms restore   223.6ms reuse 4111 
+rep 999 w2 L   2048 gen    16 prefill    505.4ms save   195.8ms restore   111.3ms reuse 2063 
+rep 999 w3 L    512 gen    16 prefill    125.8ms save    53.9ms restore    33.3ms reuse 527 
+rep 0 w2 L   1088 gen   433 prefill    218.7ms save   325.8ms restore   228.0ms reuse 1520 
+rep 0 w0 L   4345 gen   697 prefill   1038.6ms save   734.6ms restore   489.9ms reuse 5041 
+rep 0 w3 L   1083 gen   901 prefill   2663.6ms save   502.0ms restore   363.4ms reuse 1983 
+rep 0 w1 L   7028 gen   946 prefill   1810.9ms save  1036.4ms restore   670.1ms reuse 7973 
+rep 0 w2 L   5753 gen   942 prefill   2077.0ms save  1165.9ms restore   683.8ms reuse 6694 
+rep 0 w1 L   5650 gen   517 prefill   3174.0ms save   781.6ms restore   506.2ms reuse 6166 
+rep 0 w1 L   3249 gen   401 prefill   1867.5ms save   512.1ms restore   335.7ms reuse 3649 
+rep 0 w2 L   6230 gen   761 prefill   3583.5ms save  1319.8ms restore   943.6ms reuse 6990 
+rep 0 w0 L   4360 gen  1953 prefill   1838.3ms save  1386.2ms restore   820.2ms reuse 6312 
+rep 0 w1 L   5018 gen   873 prefill   2852.1ms save  1271.2ms restore   370.1ms reuse 5890 
+rep 0 w1 L   8509 gen  1247 prefill   5037.7ms save  1762.0ms restore  1270.1ms reuse 9755 
+rep 0 w2 L   1253 gen  2045 prefill    728.6ms save  1179.5ms restore   840.5ms reuse 3297 
+rep 0 w3 L  10620 gen  4126 prefill   5156.5ms save  2668.2ms restore  1878.7ms reuse 14745 
+rep 0 w3 L   1270 gen   974 prefill    744.9ms save   738.1ms restore   531.9ms reuse 2243 
+rep 0 w0 L   1131 gen  4624 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w1 L   8981 gen  2767 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w2 L   1115 gen  4040 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w3 L  11393 gen  1907 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w0 L   2134 gen   396 prefill    510.3ms save   397.2ms restore   265.8ms reuse 2529 
+rep 0 w2 L   5196 gen   561 prefill   1608.8ms save   725.0ms restore   364.2ms reuse 5756 
+rep 0 w3 L  10477 gen   859 prefill   3320.8ms save  1317.6ms restore   718.9ms reuse 11335 
+rep 0 w1 L   1080 gen   946 prefill    344.3ms save   583.8ms restore   302.8ms reuse 2025 
+rep 0 w3 L   2797 gen   367 prefill   1197.4ms save   623.6ms restore   444.7ms reuse 3163 
+rep 0 w3 L   5104 gen   701 prefill   2046.8ms save  1141.2ms restore   813.5ms reuse 5804 
+rep 0 w1 L   6394 gen  1245 prefill   2566.5ms save  1440.0ms restore   989.5ms reuse 7638 
+rep 0 w1 L   1881 gen   152 prefill    796.9ms save   468.8ms restore   333.2ms reuse 2032 
+rep 0 w3 L   6355 gen   667 prefill   2575.3ms save  1545.4ms restore   897.0ms reuse 7021 
+rep 0 w2 L   1083 gen  2465 prefill    471.6ms save  1414.4ms restore   654.5ms reuse 3547 
+rep 0 w0 L   1112 gen  3170 prefill    479.3ms save  1633.2ms restore   787.0ms reuse 4281 
+rep 0 w1 L   2441 gen  1254 prefill   1012.1ms save   977.5ms restore   582.1ms reuse 3694 
+rep 0 w3 L   1261 gen   995 prefill    528.2ms save   724.5ms restore   530.0ms reuse 2255 
+rep 0 w3 L   1925 gen   400 prefill    579.1ms save   762.5ms restore   562.8ms reuse 2324 
+rep 0 w1 L   7659 gen   518 prefill   2176.0ms save  1545.0ms restore   891.6ms reuse 8176 
+rep 0 w3 L   1091 gen   382 prefill    357.5ms save   423.5ms restore   309.6ms reuse 1472 
+rep 0 w1 L   1152 gen  1036 prefill    376.3ms save   699.9ms restore   509.5ms reuse 2187 
+rep 0 w2 L   1143 gen  2604 prefill    483.1ms save  1456.8ms restore  1075.2ms reuse 3746 
+rep 0 w1 L   2063 gen  1838 prefill    802.0ms save  1455.2ms restore  1065.4ms reuse 3900 
+rep 0 w2 L   1211 gen  1720 prefill    507.6ms save  1072.9ms restore   704.0ms reuse 2930 
+rep 0 w0 L   1247 gen  4688 prefill    410.1ms save  2282.2ms restore  1680.4ms reuse 5934 
+rep 0 w1 L   1098 gen  1676 prefill    514.9ms save  1005.0ms restore   733.5ms reuse 2773 
+rep 0 w3 L   9025 gen  4338 prefill   2976.9ms save  3192.5ms restore  2221.2ms reuse 13362 
+rep 0 w3 L   3583 gen   420 prefill   1845.3ms save   859.8ms restore   649.8ms reuse 4002 
+rep 0 w3 L   1538 gen   533 prefill    799.7ms save   645.2ms restore   479.3ms reuse 2070 
+rep 0 w1 L   1087 gen  1337 prefill    568.2ms save   833.1ms restore   602.7ms reuse 2423 
+rep 0 w3 L   3020 gen   473 prefill   1551.2ms save  1136.6ms restore   844.0ms reuse 3492 
+rep 0 w3 L   1097 gen   390 prefill    569.0ms save   501.6ms restore   372.5ms reuse 1486 
+rep 0 w1 L   2763 gen   926 prefill   1447.0ms save  1335.5ms restore   984.8ms reuse 3688 
+rep 0 w3 L   2020 gen   355 prefill   1038.2ms save   821.0ms restore   611.2ms reuse 2374 
+rep 0 w3 L   1084 gen   780 prefill   1182.9ms save   690.8ms restore   513.6ms reuse 1863 
+rep 0 w2 L   1108 gen  4603 prefill    528.0ms save  2102.6ms restore  1283.8ms reuse 5710 
+rep 0 w0 L   6783 gen  3795 prefill   3212.2ms save  3591.5ms restore  1326.1ms reuse 10577 
+rep 0 w3 L   1275 gen   889 prefill    664.2ms save   716.1ms restore   470.4ms reuse 2163 
+rep 0 w2 L   1091 gen   711 prefill    569.9ms save   527.5ms restore   231.7ms reuse 1801 
+rep 0 w2 L   3918 gen   387 prefill   1349.1ms save   932.8ms restore   707.6ms reuse 4304 
+rep 0 w3 L   1088 gen   403 prefill    377.3ms save   424.9ms restore   201.8ms reuse 1490 
+rep 0 w3 L   1698 gen   350 prefill    621.6ms save   511.6ms restore   383.9ms reuse 2047 
+rep 0 w1 L   1199 gen  5010 prefill   1043.9ms save  2436.3ms restore  1803.7ms reuse 6208 
+rep 0 w2 L   1258 gen  3043 prefill    439.8ms save  1741.5ms restore   891.1ms reuse 1514 
+rep 0 w3 L   1109 gen  3501 prefill    384.8ms save  1767.1ms restore  1133.1ms reuse 4609 
+rep 0 w0 L   1109 gen  5632 prefill    383.1ms save  2368.5ms restore  1501.0ms reuse 6740 
+rep 0 w0 L   3789 gen   424 prefill   1392.9ms save  1400.0ms restore  1025.9ms reuse 4212 
+rep 0 w1 L   1303 gen  2280 prefill    520.7ms save  1230.6ms restore   758.0ms reuse 3582 
+rep 0 w0 L   1113 gen   624 prefill    410.2ms save   417.2ms restore   296.7ms reuse 1736 
+rep 0 w2 L   3587 gen  2743 prefill   1447.3ms save  1873.3ms restore  1405.3ms reuse 6329 
+rep 0 w3 L   1243 gen  2778 prefill    507.4ms save  1413.4ms restore  1057.0ms reuse 4020 
+rep 0 w2 L   4035 gen  1037 prefill   1985.9ms save  1444.1ms restore  1082.3ms reuse 5071 
+rep 0 w0 L  13363 gen  1374 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w1 L   1220 gen  7471 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w2 L  14794 gen   613 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w3 L   5828 gen  2064 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 0 w2 L   1139 gen   368 prefill   3688.7ms save   290.8ms restore   213.2ms reuse 1506 
+rep 0 w2 L   8006 gen   471 prefill   3566.4ms save  1085.3ms restore   726.1ms reuse 8476 
+rep 0 w1 L   1514 gen   949 prefill    224.2ms save   594.7ms restore   271.7ms reuse 2462 
+rep 0 w3 L   1113 gen  1623 prefill    993.3ms save   881.0ms restore   494.6ms reuse 2735 
+rep 0 w0 L  13383 gen  1911 prefill   3463.6ms save  1999.8ms restore  1150.4ms reuse 15293 
+rep 0 w1 L   1110 gen   982 prefill    600.9ms save   602.1ms restore   154.4ms reuse 2091 
+rep 0 w3 L   1102 gen   361 prefill    602.4ms save   328.1ms restore   136.2ms reuse 1462 
+rep 0 w0 L   2208 gen   391 prefill   1013.8ms save   440.7ms restore   301.3ms reuse 2598 
+rep 0 w1 L   6354 gen   642 prefill   2744.0ms save   921.7ms restore   577.5ms reuse 6995 
+rep 0 w0 L   1172 gen   491 prefill    504.9ms save   400.3ms restore   282.9ms reuse 1662 
+rep 0 w3 L   1108 gen   979 prefill    487.0ms save   671.7ms restore   388.9ms reuse 2086 
+rep 0 w2 L   1124 gen  2228 prefill    650.9ms save  1168.1ms restore   489.7ms reuse 3351 
+rep 0 w1 L   2480 gen   498 prefill   1066.3ms save   633.6ms restore   420.9ms reuse 2977 
+rep 0 w2 L   2298 gen   530 prefill   1044.9ms save   565.1ms restore   408.4ms reuse 2827 
+rep 0 w2 L   1531 gen  1066 prefill    415.4ms save   728.2ms restore   528.7ms reuse 2596 
+rep 0 w0 L   3691 gen  2473 prefill   1601.4ms save  1738.1ms restore  1262.4ms reuse 6163 
+rep 0 w3 L   1097 gen  2715 prefill    475.1ms save  1495.4ms restore   628.7ms reuse 3811 
+rep 0 w3 L   7965 gen   974 prefill   2628.9ms save  2316.2ms restore  1728.5ms reuse 8938 
+rep 0 w0 L   1113 gen  2095 prefill    373.1ms save  1285.6ms restore   941.3ms reuse 3207 
+rep 0 w3 L   8770 gen   981 prefill   3565.8ms save  2745.2ms restore  2037.8ms reuse 9750 
+rep 0 w1 L   1194 gen  4791 prefill    356.8ms save  2448.0ms restore   815.3ms reuse 5984 
+rep 0 w0 L   3709 gen   703 prefill   1672.8ms save  1677.6ms restore   664.2ms reuse 4411 
+rep 0 w3 L   3015 gen   615 prefill   1437.5ms save   981.4ms restore   721.2ms reuse 3629 
+rep 0 w1 L   1108 gen   624 prefill    538.9ms save   634.7ms restore   470.7ms reuse 1731 
+rep 0 w2 L   1099 gen  3867 prefill    344.5ms save  1995.0ms restore   745.9ms reuse 4965 
+rep 0 w3 L   5837 gen   485 prefill   2810.4ms save  1327.5ms restore   857.6ms reuse 6321 
+rep 0 w0 L   1826 gen  1100 prefill    867.5ms save  1061.1ms restore   718.7ms reuse 2925 
+rep 0 w3 L   5105 gen   482 prefill   1674.3ms save  1271.7ms restore   720.9ms reuse 5586 
+rep 0 w1 L   1205 gen  1027 prefill    594.9ms save   850.5ms restore   533.1ms reuse 2231 
+rep 0 w3 L   4538 gen   458 prefill   1484.0ms save  1158.0ms restore   838.8ms reuse 4995 
+rep 0 w0 L   1522 gen  1005 prefill    497.4ms save   903.8ms restore   688.2ms reuse 2526 
+rep 0 w2 L   1088 gen  1655 prefill    363.0ms save   898.7ms restore   411.7ms reuse 2742 
+rep 0 w1 L   6011 gen  1271 prefill   1801.7ms save  1827.0ms restore  1287.3ms reuse 7281 
+rep 0 w2 L   1102 gen  1877 prefill    425.8ms save  1057.5ms restore   712.1ms reuse 2978 
+rep 0 w0 L   3854 gen  2192 prefill   1389.5ms save  2117.2ms restore  1355.4ms reuse 6045 
+rep 0 w0 L   1082 gen   569 prefill    428.0ms save   813.2ms restore   603.5ms reuse 1650 
+rep 0 w2 L   1668 gen  1212 prefill    664.3ms save  1003.0ms restore   732.4ms reuse 2879 
+rep 0 w1 L   1108 gen  2886 prefill    441.1ms save  1662.3ms restore  1234.6ms reuse 3993 
+rep 0 w0 L   7054 gen  1371 prefill   2790.7ms save  2121.5ms restore  1535.0ms reuse 8424 
+rep 0 w3 L   4063 gen  4666 prefill   1380.6ms save  2683.8ms restore  1512.1ms reuse 8728 
+rep 0 w2 L   8488 gen  1926 prefill   4029.5ms save  2258.5ms restore  1324.9ms reuse 10413 
+rep 0 w1 L   1114 gen  2213 prefill    629.1ms save  1369.0ms restore   719.2ms reuse 3326 
+rep 0 w0 L   1190 gen  1821 prefill    736.2ms save  1098.3ms restore   144.5ms reuse 3010 
+rep 1 w2 L   4538 gen   458 prefill   1110.6ms save   637.6ms restore   413.1ms reuse 4995 
+rep 1 w0 L   2480 gen   498 prefill    504.7ms save   486.7ms restore   174.0ms reuse 2977 
+rep 1 w1 L   1108 gen   624 prefill    339.6ms save   422.6ms restore   133.7ms reuse 1731 
+rep 1 w3 L   8770 gen   981 prefill   2982.8ms save  1238.9ms restore   693.9ms reuse 9750 
+rep 1 w1 L   2441 gen  1254 prefill    968.8ms save   934.0ms restore   661.5ms reuse 3694 
+rep 1 w0 L   1083 gen  2465 prefill    433.5ms save  1371.7ms restore   992.5ms reuse 3547 
+rep 1 w3 L   1243 gen  2778 prefill    436.0ms save  1533.4ms restore  1118.2ms reuse 4020 
+rep 1 w1 L   3854 gen  2192 prefill   1334.5ms save  1802.7ms restore  1192.7ms reuse 6045 
+rep 1 w2 L   1131 gen  4624 prefill    479.8ms save  2098.9ms restore  1159.7ms reuse 5754 
+rep 1 w3 L   1087 gen  1337 prefill    388.5ms save   972.0ms restore   719.1ms reuse 2423 
+rep 1 w3 L   2298 gen   530 prefill    809.4ms save  1177.2ms restore   867.3ms reuse 2827 
+rep 1 w1 L   1102 gen  1877 prefill    396.1ms save  1103.2ms restore   802.1ms reuse 2978 
+rep 1 w2 L   6011 gen  1271 prefill   2100.3ms save  2118.3ms restore  1579.2ms reuse 7281 
+rep 1 w1 L   5105 gen   482 prefill   1804.6ms save  1763.6ms restore  1024.5ms reuse 5586 
+rep 1 w1 L   3015 gen   615 prefill   1199.4ms save  1109.5ms restore   817.1ms reuse 3629 
+rep 1 w3 L   1113 gen  1623 prefill    396.3ms save  1259.0ms restore   846.3ms reuse 2735 
+rep 1 w2 L   1514 gen   949 prefill    605.6ms save   787.7ms restore   466.3ms reuse 2462 
+rep 1 w1 L   1925 gen   400 prefill    767.6ms save   690.9ms restore   502.8ms reuse 2324 
+rep 1 w0 L   1108 gen  4603 prefill    392.9ms save  2003.5ms restore   713.4ms reuse 5710 
+rep 1 w2 L   1698 gen   350 prefill    729.4ms save   543.2ms restore   372.9ms reuse 2047 
+rep 1 w3 L   1082 gen   569 prefill    437.1ms save   686.6ms restore   323.2ms reuse 1650 
+rep 1 w0 L   1088 gen   403 prefill    286.9ms save   302.8ms restore   215.8ms reuse 1490 
+rep 1 w1 L   1261 gen   995 prefill    513.1ms save   671.8ms restore   485.0ms reuse 2255 
+rep 1 w1 L   1091 gen   382 prefill    235.6ms save   333.6ms restore   239.7ms reuse 1472 
+rep 1 w1 L   1826 gen  1100 prefill    398.1ms save   930.4ms restore   676.0ms reuse 2925 
+rep 1 w0 L   1112 gen  3170 prefill    289.6ms save  1570.3ms restore  1146.0ms reuse 4281 
+rep 1 w2 L   1099 gen  3867 prefill    288.8ms save  1988.5ms restore  1330.0ms reuse 4965 
+rep 1 w1 L   1303 gen  2280 prefill    390.5ms save  1307.9ms restore   819.1ms reuse 3582 
+rep 1 w2 L   1080 gen   946 prefill    383.3ms save   796.0ms restore   590.1ms reuse 2025 
+rep 1 w0 L   1088 gen  1655 prefill    380.8ms save   931.6ms restore   680.8ms reuse 2742 
+rep 1 w2 L   1139 gen   368 prefill    477.5ms save   529.6ms restore   393.6ms reuse 1506 
+rep 1 w0 L  14794 gen   613 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w1 L   8981 gen  2767 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w2 L   1199 gen  5010 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w3 L   1220 gen  7471 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w0 L   3709 gen   703 prefill    508.9ms save   701.5ms restore   457.0ms reuse 4411 
+rep 1 w1 L   1110 gen   982 prefill    698.7ms save   600.4ms restore   439.1ms reuse 2091 
+rep 1 w0 L   6355 gen   667 prefill   1633.1ms save  1202.2ms restore   818.5ms reuse 7021 
+rep 1 w1 L   3249 gen   401 prefill    993.8ms save   912.1ms restore   367.3ms reuse 3649 
+rep 1 w2 L   1113 gen  2095 prefill    357.1ms save  1182.1ms restore   865.1ms reuse 3207 
+rep 1 w2 L   2020 gen   355 prefill    974.3ms save   750.2ms restore   542.4ms reuse 2374 
+rep 1 w1 L   7054 gen  1371 prefill   2777.8ms save  1473.6ms restore  1033.7ms reuse 8424 
+rep 1 w2 L   8006 gen   471 prefill   4229.0ms save  1481.2ms restore  1111.6ms reuse 8476 
+rep 1 w2 L   2208 gen   391 prefill   1403.8ms save   869.9ms restore   633.2ms reuse 2598 
+rep 1 w2 L   1102 gen   361 prefill    672.1ms save   292.7ms restore   208.7ms reuse 1462 
+rep 1 w3 L   1115 gen  4040 prefill    547.6ms save  1855.8ms restore  1260.1ms reuse 5154 
+rep 1 w2 L   3020 gen   473 prefill   1811.8ms save   698.7ms restore   683.7ms reuse 3492 
+rep 1 w3 L   1531 gen  1066 prefill    917.6ms save   819.7ms restore   602.4ms reuse 2596 
+rep 1 w0 L   9025 gen  4338 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w1 L   3587 gen  2743 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w2 L   1124 gen  2228 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w3 L  13383 gen  1911 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w0 L  10477 gen   859 prefill   2745.0ms save  1309.5ms restore   852.5ms reuse 11335 
+rep 1 w3 L   5018 gen   873 prefill   2065.2ms save   882.4ms restore   306.9ms reuse 5890 
+rep 1 w1 L   1668 gen  1212 prefill    225.2ms save   775.9ms restore   265.7ms reuse 2879 
+rep 1 w3 L   1152 gen  1036 prefill    586.1ms save   635.1ms restore   459.7ms reuse 2187 
+rep 1 w2 L   4360 gen  1953 prefill   4424.4ms save  1391.4ms restore   694.7ms reuse 6312 
+rep 1 w3 L   6354 gen   642 prefill   3192.9ms save  1317.7ms restore   891.0ms reuse 6995 
+rep 1 w0 L   1143 gen  2604 prefill    580.1ms save  1280.3ms restore   924.0ms reuse 3746 
+rep 1 w0 L   5104 gen   701 prefill   2102.7ms save  1737.8ms restore  1271.6ms reuse 5804 
+rep 1 w3 L   1114 gen  2213 prefill    469.8ms save  1149.8ms restore   667.4ms reuse 3326 
+rep 1 w0 L   1084 gen   780 prefill    453.3ms save   497.9ms restore   358.9ms reuse 1863 
+rep 1 w3 L   4035 gen  1037 prefill   1659.2ms save  1462.7ms restore  1073.3ms reuse 5071 
+rep 1 w1 L   4063 gen  4666 prefill   2027.9ms save  2540.6ms restore  1837.2ms reuse 8728 
+rep 1 w0 L   1253 gen  2045 prefill    524.5ms save  1165.2ms restore   853.6ms reuse 3297 
+rep 1 w2 L   1109 gen  5632 prefill    462.7ms save  2843.6ms restore  2101.1ms reuse 6740 
+rep 1 w0 L   5828 gen  2064 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w1 L   6783 gen  3795 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w2 L   7659 gen   518 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w3 L   8488 gen  1926 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w2 L   5650 gen   517 prefill   2890.8ms save   745.1ms restore   493.2ms reuse 6166 
+rep 1 w0 L   5196 gen   561 prefill    858.6ms save   777.2ms restore   482.6ms reuse 5756 
+rep 1 w1 L   7965 gen   974 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w0 L  11393 gen  1907 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w2 L   8509 gen  1247 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w3 L   4345 gen   697 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 1 w1 L   3789 gen   424 prefill   1118.3ms save   550.5ms restore   368.9ms reuse 4212 
+rep 1 w0 L   2763 gen   926 prefill    511.9ms save   731.6ms restore   494.8ms reuse 3688 
+rep 1 w2 L   1522 gen  1005 prefill    421.2ms save   653.8ms restore   280.0ms reuse 2526 
+rep 1 w0 L   1881 gen   152 prefill    885.8ms save   244.7ms restore   158.8ms reuse 2032 
+rep 1 w1 L  13363 gen  1374 prefill   4314.5ms save  2006.0ms restore  1338.1ms reuse 14736 
+rep 1 w3 L   1190 gen  1821 prefill    685.1ms save  1024.1ms restore   179.2ms reuse 3010 
+rep 1 w2 L   5753 gen   942 prefill   2641.3ms save  1813.2ms restore   758.8ms reuse 6694 
+rep 1 w1 L   3918 gen   387 prefill   2265.6ms save  1093.4ms restore   469.3ms reuse 4304 
+rep 1 w0 L   1211 gen  1720 prefill    605.3ms save   970.8ms restore   486.4ms reuse 2930 
+rep 1 w1 L   1113 gen   624 prefill    583.5ms save   603.7ms restore   274.9ms reuse 1736 
+rep 1 w2 L   1275 gen   889 prefill    665.7ms save   653.0ms restore   313.0ms reuse 2163 
+rep 1 w0 L   1097 gen   390 prefill    386.2ms save   296.2ms restore   210.8ms reuse 1486 
+rep 1 w0 L   1172 gen   491 prefill    410.4ms save   392.4ms restore   280.0ms reuse 1662 
+rep 1 w1 L   1108 gen   979 prefill    395.5ms save   666.3ms restore   495.3ms reuse 2086 
+rep 1 w3 L   3691 gen  2473 prefill   1923.4ms save  1348.4ms restore   974.7ms reuse 6163 
+rep 1 w0 L   1270 gen   974 prefill    449.3ms save   680.8ms restore   327.2ms reuse 2243 
+rep 1 w3 L   2134 gen   396 prefill    968.5ms save   524.5ms restore   319.9ms reuse 2529 
+rep 1 w3 L   1538 gen   533 prefill    698.8ms save   541.9ms restore   392.5ms reuse 2070 
+rep 1 w2 L   1247 gen  4688 prefill    447.0ms save  2435.6ms restore  1796.7ms reuse 5934 
+rep 1 w0 L   1108 gen  2886 prefill    502.4ms save  1561.8ms restore   856.1ms reuse 3993 
+rep 1 w1 L  10620 gen  4126 prefill   3867.1ms save  3236.7ms restore  1403.7ms reuse 14745 
+rep 1 w3 L   1258 gen  3043 prefill    574.4ms save  1680.1ms restore   552.7ms reuse 4300 
+rep 1 w2 L   1205 gen  1027 prefill    683.5ms save   675.6ms restore   487.5ms reuse 2231 
+rep 1 w1 L   1091 gen   711 prefill    598.9ms save   574.5ms restore   430.0ms reuse 1801 
+rep 1 w0 L   1098 gen  1676 prefill    610.1ms save   869.1ms restore   629.1ms reuse 2773 
+rep 1 w2 L   6230 gen   761 prefill   2641.4ms save  1418.0ms restore   803.4ms reuse 6990 
+rep 1 w1 L   7028 gen   946 prefill   2927.1ms save  1428.9ms restore   807.1ms reuse 7973 
+rep 1 w0 L   1088 gen   433 prefill    448.2ms save   316.2ms restore   178.9ms reuse 1520 
+rep 1 w0 L   5837 gen   485 prefill   2379.4ms save  1022.5ms restore   733.3ms reuse 6321 
+rep 1 w1 L   1083 gen   901 prefill    443.4ms save   674.8ms restore   367.6ms reuse 1983 
+rep 1 w1 L   2797 gen   367 prefill   1141.9ms save   749.2ms restore   553.3ms reuse 3163 
+rep 1 w1 L   3583 gen   420 prefill   1459.2ms save   997.5ms restore   741.7ms reuse 4002 
+rep 1 w3 L   1109 gen  3501 prefill    468.8ms save  1681.3ms restore  1088.8ms reuse 4609 
+rep 1 w1 L   6394 gen  1245 prefill   2587.1ms save  1801.3ms restore  1308.9ms reuse 7638 
+rep 1 w0 L   1097 gen  2715 prefill    447.3ms save  1379.8ms restore   539.3ms reuse 3811 
+rep 1 w3 L   2063 gen  1838 prefill    789.2ms save  1442.8ms restore   777.0ms reuse 3900 
+rep 1 w2 L   1194 gen  4791 prefill    533.3ms save  1873.3ms restore   272.8ms reuse 5984 
+rep 2 w0 L   5837 gen   485 prefill   1067.2ms save   739.1ms restore   479.4ms reuse 6321 
+rep 2 w0 L   3020 gen   473 prefill   1073.5ms save   516.3ms restore   348.4ms reuse 3492 
+rep 2 w2 L   6394 gen  1245 prefill   2084.5ms save  1191.1ms restore   796.2ms reuse 7638 
+rep 2 w2 L   6230 gen   761 prefill   2251.4ms save  1176.5ms restore   823.5ms reuse 6990 
+rep 2 w3 L   1114 gen  2213 prefill   3005.9ms save  1122.2ms restore   450.2ms reuse 3326 
+rep 2 w1 L   1124 gen  2228 prefill    220.9ms save  1130.6ms restore   627.0ms reuse 3351 
+rep 2 w3 L   1172 gen   491 prefill    454.0ms save   466.4ms restore   335.3ms reuse 1662 
+rep 2 w0 L   3854 gen  2192 prefill   1378.7ms save  1634.9ms restore  1167.1ms reuse 6045 
+rep 2 w1 L  13383 gen  1911 prefill   5246.9ms save  2799.2ms restore  1863.8ms reuse 15293 
+rep 2 w0 L   1270 gen   974 prefill    628.6ms save   615.5ms restore   501.2ms reuse 2243 
+rep 2 w1 L   3709 gen   703 prefill   2329.0ms save   924.7ms restore   672.3ms reuse 4411 
+rep 2 w0 L   5018 gen   873 prefill   2457.0ms save  1358.6ms restore   922.5ms reuse 5890 
+rep 2 w1 L   1538 gen   533 prefill    769.8ms save   415.0ms restore   296.3ms reuse 2070 
+rep 2 w1 L   2480 gen   498 prefill   1219.0ms save   708.6ms restore   509.8ms reuse 2977 
+rep 2 w0 L   1668 gen  1212 prefill    821.7ms save  1108.3ms restore   821.5ms reuse 2879 
+rep 2 w0 L   5650 gen   517 prefill   2782.2ms save  1747.2ms restore  1277.4ms reuse 6166 
+rep 2 w1 L   7028 gen   946 prefill   3461.2ms save  1949.3ms restore  1364.9ms reuse 7973 
+rep 2 w2 L   1199 gen  5010 prefill    474.7ms save  2640.0ms restore  1959.4ms reuse 6208 
+rep 2 w0 L   5104 gen   701 prefill   2569.0ms save  1691.7ms restore  1160.2ms reuse 5804 
+rep 2 w3 L   1194 gen  4791 prefill    612.8ms save  2550.3ms restore  1228.6ms reuse 5984 
+rep 2 w3 L   4538 gen   458 prefill   2821.3ms save  1342.9ms restore   986.2ms reuse 4995 
+rep 2 w2 L   5828 gen  2064 prefill   3099.0ms save  3250.6ms restore  2392.4ms reuse 7891 
+rep 2 w3 L   1098 gen  1676 prefill    619.5ms save  1033.9ms restore   722.0ms reuse 2773 
+rep 2 w2 L   1084 gen   780 prefill    625.2ms save   927.3ms restore   687.3ms reuse 1863 
+rep 2 w3 L   1261 gen   995 prefill    737.5ms save  1142.3ms restore   841.8ms reuse 2255 
+rep 2 w2 L   5753 gen   942 prefill   3327.6ms save  2428.6ms restore  1762.2ms reuse 6694 
+rep 2 w1 L   9025 gen  4338 prefill   4670.9ms save  3736.6ms restore  2024.5ms reuse 13362 
+rep 2 w2 L   1088 gen   433 prefill    674.8ms save   756.5ms restore   525.3ms reuse 1520 
+rep 2 w0 L   6783 gen  3795 prefill   4445.7ms save  3530.1ms restore  2117.9ms reuse 10577 
+rep 2 w1 L   5196 gen   561 prefill   3169.1ms save  1434.0ms restore  1052.5ms reuse 5756 
+rep 2 w1 L   1139 gen   368 prefill    696.6ms save   298.3ms restore   214.1ms reuse 1506 
+rep 2 w0 L  11393 gen  1907 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w1 L   4360 gen  1953 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w2 L   8981 gen  2767 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w3 L   1243 gen  2778 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w2 L   1698 gen   350 prefill    645.1ms save   336.1ms restore   234.0ms reuse 2047 
+rep 2 w3 L   1925 gen   400 prefill    443.3ms save   376.3ms restore   141.1ms reuse 2324 
+rep 2 w3 L   1088 gen   403 prefill    247.3ms save   318.5ms restore   226.9ms reuse 1490 
+rep 2 w2 L   1082 gen   569 prefill    246.3ms save   358.3ms restore   256.9ms reuse 1650 
+rep 2 w0 L   1826 gen  1100 prefill    221.5ms save   613.9ms restore   421.7ms reuse 2925 
+rep 2 w2 L   1190 gen  1821 prefill    285.7ms save  1075.1ms restore   787.6ms reuse 3010 
+rep 2 w0 L   1088 gen  1655 prefill    245.6ms save   946.3ms restore   336.8ms reuse 2742 
+rep 2 w0 L   2298 gen   530 prefill   1068.8ms save   478.9ms restore   327.3ms reuse 2827 
+rep 2 w0 L  14794 gen   613 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w1 L   1109 gen  3501 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w2 L  10620 gen  4126 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w3 L   1109 gen  5632 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w3 L   1097 gen   390 prefill    840.4ms save   296.9ms restore   219.5ms reuse 1486 
+rep 2 w2 L   6354 gen   642 prefill   2971.6ms save   837.2ms restore   545.5ms reuse 6995 
+rep 2 w1 L   6355 gen   667 prefill   1557.9ms save   879.6ms restore   367.0ms reuse 7021 
+rep 2 w3 L   1091 gen   711 prefill    396.1ms save   464.2ms restore   243.7ms reuse 1801 
+rep 2 w1 L   1083 gen   901 prefill    404.1ms save   560.7ms restore   404.6ms reuse 1983 
+rep 2 w0 L   1113 gen  1623 prefill    223.9ms save   873.8ms restore   480.5ms reuse 2735 
+rep 2 w2 L   1087 gen  1337 prefill    404.9ms save   705.5ms restore   499.6ms reuse 2423 
+rep 2 w3 L   8509 gen  1247 prefill   3192.0ms save  1490.3ms restore  1039.2ms reuse 9755 
+rep 2 w2 L   7965 gen   974 prefill   2909.6ms save  1695.4ms restore  1027.1ms reuse 8938 
+rep 2 w2 L   1522 gen  1005 prefill    681.7ms save   892.7ms restore   651.8ms reuse 2526 
+rep 2 w0 L   1108 gen  2886 prefill    375.2ms save  1541.9ms restore  1007.0ms reuse 3993 
+rep 2 w0 L   1080 gen   946 prefill    491.4ms save   585.4ms restore   420.5ms reuse 2025 
+rep 2 w3 L   4063 gen  4666 prefill   1821.9ms save  2490.1ms restore  1791.3ms reuse 8728 
+rep 2 w0 L   1113 gen  2095 prefill    505.7ms save  1188.0ms restore   715.0ms reuse 3207 
+rep 2 w0 L  13363 gen  1374 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w1 L   1220 gen  7471 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w2 L   1247 gen  4688 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w3 L   3691 gen  2473 prefill      nanms save     nanms restore     nanms reuse None {"code": 500, "message": "Context size has been exceeded.", "type": "server_error"}
+rep 2 w3 L   2797 gen   367 prefill    705.1ms save   438.9ms restore   298.7ms reuse 3163 
+rep 2 w0 L   1108 gen   624 prefill    222.7ms save   420.8ms restore   183.5ms reuse 1731 
+rep 2 w1 L   1275 gen   889 prefill    511.5ms save   544.3ms restore   331.8ms reuse 2163 
+rep 2 w3 L   1113 gen   624 prefill    246.2ms save   380.1ms restore   280.7ms reuse 1736 
+rep 2 w2 L   1205 gen  1027 prefill    289.4ms save   587.4ms restore   324.9ms reuse 2231 
+rep 2 w3 L   1881 gen   152 prefill    406.7ms save   532.3ms restore   392.4ms reuse 2032 
+rep 2 w3 L   1091 gen   382 prefill    351.9ms save   292.7ms restore   216.5ms reuse 1472 
+rep 2 w2 L   8770 gen   981 prefill   2159.9ms save  1419.0ms restore   961.7ms reuse 9750 
+rep 2 w1 L   1211 gen  1720 prefill    266.6ms save   963.6ms restore   456.8ms reuse 2930 
+rep 2 w2 L   1531 gen  1066 prefill    719.2ms save   767.4ms restore   554.2ms reuse 2596 
+rep 2 w0 L   1097 gen  2715 prefill    244.7ms save  1343.5ms restore   896.0ms reuse 3811 
+rep 2 w3 L   8488 gen  1926 prefill   3210.7ms save  1801.8ms restore  1038.7ms reuse 10413 
+rep 2 w0 L   5105 gen   482 prefill   2421.7ms save  1411.3ms restore   938.9ms reuse 5586 
+rep 2 w1 L   2063 gen  1838 prefill    984.5ms save  1347.2ms restore   987.6ms reuse 3900 
+rep 2 w3 L   1110 gen   982 prefill    470.2ms save   612.6ms restore   360.8ms reuse 2091 
+rep 2 w0 L   7054 gen  1371 prefill   2954.0ms save  1806.2ms restore  1247.3ms reuse 8424 
+rep 2 w1 L   1108 gen   979 prefill    471.3ms save   593.0ms restore   380.7ms reuse 2086 
+rep 2 w0 L   4035 gen  1037 prefill   1676.5ms save  1454.6ms restore  1075.4ms reuse 5071 
+rep 2 w3 L   1102 gen  1877 prefill    471.6ms save  1069.0ms restore   788.6ms reuse 2978 
+rep 2 w0 L  10477 gen   859 prefill   4391.2ms save  2609.2ms restore  1890.4ms reuse 11335 
+rep 2 w0 L   2134 gen   396 prefill    989.8ms save   613.0ms restore   448.3ms reuse 2529 
+rep 2 w3 L   2441 gen  1254 prefill   1021.2ms save  1388.2ms restore   654.2ms reuse 3694 
+rep 2 w2 L   1131 gen  4624 prefill    577.3ms save  2055.8ms restore   781.2ms reuse 5754 
+rep 2 w3 L   2020 gen   355 prefill    931.7ms save   489.2ms restore   366.2ms reuse 2374 
+rep 2 w3 L   3015 gen   615 prefill   1383.9ms save   909.0ms restore   685.5ms reuse 3629 
+rep 2 w3 L   8006 gen   471 prefill   3730.8ms save  1811.5ms restore  1357.0ms reuse 8476 
+rep 2 w0 L   1253 gen  2045 prefill    587.3ms save  1159.2ms restore   715.4ms reuse 3297 
+rep 2 w0 L   3789 gen   424 prefill   1761.5ms save  1318.6ms restore   970.1ms reuse 4212 
+rep 2 w1 L   1108 gen  4603 prefill    465.4ms save  2170.3ms restore   881.6ms reuse 5710 
+rep 2 w0 L   1102 gen   361 prefill    516.5ms save   304.6ms restore   216.5ms reuse 1462 
+rep 2 w1 L   4345 gen   697 prefill   1667.6ms save  1241.9ms restore   930.8ms reuse 5041 
+rep 2 w2 L   1258 gen  3043 prefill    586.1ms save  1613.9ms restore   473.5ms reuse 4300 
+rep 2 w0 L   3918 gen   387 prefill   1516.2ms save   958.2ms restore   576.8ms reuse 4304 
+rep 2 w2 L   6011 gen  1271 prefill   2098.6ms save  1503.0ms restore  1127.7ms reuse 7281 
+rep 2 w3 L   1099 gen  3867 prefill    506.4ms save  1820.0ms restore   928.2ms reuse 4965 
+rep 2 w1 L   1143 gen  2604 prefill    406.9ms save  1413.7ms restore   653.9ms reuse 3746 
+rep 2 w0 L   1112 gen  3170 prefill    393.0ms save  1553.9ms restore   768.0ms reuse 1448 
+rep 2 w3 L   1152 gen  1036 prefill    417.9ms save   685.2ms restore   509.9ms reuse 2187 
+rep 2 w1 L   1514 gen   949 prefill    536.1ms save   766.4ms restore   561.9ms reuse 2462 
+rep 2 w2 L   1303 gen  2280 prefill    456.8ms save  1029.9ms restore   758.4ms reuse 3582 
+rep 2 w0 L   7659 gen   518 prefill   2290.3ms save  1514.7ms restore  1076.4ms reuse 8176 
+rep 2 w1 L   3583 gen   420 prefill   1245.4ms save  1033.5ms restore   670.5ms reuse 4002 
+rep 2 w0 L   2208 gen   391 prefill    864.0ms save   739.2ms restore   539.9ms reuse 2598 
+rep 2 w1 L   2763 gen   926 prefill   1039.4ms save  1193.8ms restore   872.6ms reuse 3688 
+rep 2 w1 L   3249 gen   401 prefill   1216.4ms save  1169.3ms restore   858.2ms reuse 3649 
+rep 2 w2 L   3587 gen  2743 prefill   1296.1ms save  1949.5ms restore  1281.1ms reuse 6329 
+rep 2 w0 L   1083 gen  2465 prefill    406.0ms save  1223.6ms restore   464.8ms reuse 3547 
+rep 2 w3 L   1115 gen  4040 prefill    380.1ms save  1722.1ms restore   238.5ms reuse 5154 
+wrote /home/ec2-user/rohan/MemAware-Agent-Edge-Serving/swap_vs_stay_vs_recompute/data/measurements.csv

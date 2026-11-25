@@ -1,0 +1,24 @@
+{
+  "env": {
+    "timestamp": "2026-11-17T05:55:45",
+    "machine": "x86_64",
+    "power": "unknown",
+    "memory_gib": 15.4,
+    "os": "Linux 6.12.111-136.204.amzn2023.x86_64",
+    "llama_cpp_commit": "",
+    "model": "Qwen3-0.6B-Q8_0.gguf",
+    "model_bytes": 639446688
+  },
+  "args": {
+    "trace": "data/traces/agenttrace_50_seed2.jsonl",
+    "reps": 3,
+    "workers": 4,
+    "ctx": 32768,
+    "seed": 2,
+    "port": 8091,
+    "out": "/home/ec2-user/rohan/MemAware-Agent-Edge-Serving/swap_vs_stay_vs_recompute/data"
+  },
+  "server_args": "/home/ec2-user/bin/llama-server-kv -m /home/ec2-user/Qwen3-0.6B-Q8_0.gguf -c 32768 -np 4 --port 8091 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none --slot-save-path /dev/shm/kvswap-oela1mit",
+  "slot_save_path": "tmpfs under /dev/shm (host RAM)",
+  "doc": "Measure KV swap-out, swap-in and recompute times under FIFO N4 load.\n\nWorkload: every model request of the 50-task smoke trace (data/traces/agenttrace_50_seed2.jsonl), 113 requests,\ntreated as independent jobs. Tool waits and task structure are ignored. Request j has\n  L_prompt = full prompt length before that request (task inputs + earlier outputs)\n  n_gen    = its output budget\nand its prompt is L_prompt random ordinary-vocabulary tokens, so no request reuses another's cache and every\nprefill is a full recompute (content does not change timing).\n\nScheduler: one FIFO queue, 4 workers (N4), all requests queued at t = 0 in a seeded shuffled order per repetition.\nWorker w always uses server slot w. For each request:\n  1. erase slot w                                   (start empty: full prefill)\n  2. /completion, n_gen tokens, ignore_eos          -> recompute time   = server prompt_ms for L_prompt tokens\n  3. POST /slots/w?action=save                      -> GPU->CPU time    = server save_ms for n_saved tokens\n  4. erase slot w\n  5. POST /slots/w?action=restore                   -> CPU->GPU time    = server restore_ms for n_restored tokens\n  6. verify: resend the prompt + its output with n_predict 1; the restored cache must be reused\n  7. erase slot w\nSteps 2-6 run while the other three workers keep decoding, so every time includes N4 contention.\n\nServer: the Phase 1 N4 configuration (Qwen3-0.6B Q8_0, f16 KV, -c 32768 -np 4 -kvu, --cache-ram 0, no mmap),\nplus --slot-save-path on /dev/shm (RAM-backed tmpfs), so save/restore copies KV between GPU and host memory\nthrough llama.cpp's own sequence-state path without touching disk.\n"
+}

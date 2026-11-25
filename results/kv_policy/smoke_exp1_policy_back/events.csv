@@ -1,0 +1,2 @@
+t,event,task_id,step,slot,cells,error
+751.6071653449999,restore_failed,agenttrace-mbpp-18-qwen3-1.7b,3,14,,"RuntimeError: restore slot 14: 400 {'error': {'code': 400, 'message': 'Unable to restore slot: No available space in KV cache or invalid slot save file', 'type': 'invalid_request_error'}}"

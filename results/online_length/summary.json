@@ -1,0 +1,48 @@
+{
+  "fixed_cap": {
+    "all": {
+      "tau": 0.0,
+      "MAE": 1271.5121722846443,
+      "median_pct_err": 113.333564815066,
+      "under_pct": 22.846441947565545
+    },
+    "after_warmup": {
+      "tau": 0.0,
+      "MAE": 1272.6362754607178,
+      "median_pct_err": 112.00828157349896,
+      "under_pct": 22.890397672162948
+    }
+  },
+  "online_median": {
+    "all": {
+      "tau": 0.23955698041878074,
+      "MAE": 841.2345505617977,
+      "median_pct_err": 48.33067245032182,
+      "under_pct": 53.838951310861425
+    },
+    "after_warmup": {
+      "tau": 0.25953096462846426,
+      "MAE": 826.9170708050436,
+      "median_pct_err": 47.427502338634234,
+      "under_pct": 54.99515033947624
+    }
+  },
+  "online_gbm": {
+    "all": {
+      "tau": 0.28064373220063515,
+      "MAE": 861.2953728395094,
+      "median_pct_err": 50.72933863557103,
+      "under_pct": 53.838951310861425
+    },
+    "after_warmup": {
+      "tau": 0.3028084891645972,
+      "MAE": 847.6978255990261,
+      "median_pct_err": 49.781496720814204,
+      "under_pct": 54.99515033947624
+    }
+  },
+  "n_requests": 1068,
+  "n_before_warmup": 37,
+  "warmup_ends_min": 2.1329767593833293,
+  "doc": "Online (no-future-data) output-length estimation on the 500-task workload: how does ranking quality grow with history?\n\nQuestion (user, 2026-11-25): start with the fixed output budget of the fixed-cap runs and, as requests finish, update\nthe estimated output length of each new request from the history gathered so far. How much does Kendall's tau improve,\nand how fast?\n\nReplay of information, not of serving: each request (one agent step) gets its admission time (first chunk sent) and\ncompletion time (last chunk finished) from the 500-task E6 run (results/mem_admission/full500_e6_cap2048_lookup), the\nclosest real run with fixed 2,048-token reservations. When a request is admitted, an estimator may use ONLY requests\nwhose completion time is earlier (their true lengths are then known to the server) plus what the request itself shows\nat admission. No offline data, no lookup table, no future data. Caveat: real orderings would change these times; the\ntimeline is held fixed here.\n\nEstimators (refitted after every REFIT new completions; before MIN_FIT completions every request gets the fixed cap):\n  fixed_cap      every request 2,048 (the fixed-cap runs; no ranking: all tied, tau undefined, shown as 0)\n  online_median  median true length of completed requests with the same (class, step 0 / 1 / 2+); falls back to the\n                 overall completed median for an unseen cell\n  online_gbm     gradient-boosted trees on log length, features known at admission: class, step, this task's\n                 previous output lengths (last, mean), tool result error flag and length, history size in tokens,\n                 task text length, number of test cases in the task text\nScored in windows of 100 requests by admission order: Kendall tau-b, MAE, median % error, share underestimated, and\nthe number of completed requests the estimator had learned from.\nOutputs: results/online_length/predictions.csv, windows.csv, summary.json, tau_over_time.png.\n"
+}

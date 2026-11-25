@@ -1,0 +1,22 @@
+[1/15] none      kv   1024 tpot 5.47 ms prefill 1 
+[2/15] keep_low  kv   5120 tpot 7.41 ms prefill 1 
+[3/15] keep_low  kv   5120 tpot 7.36 ms prefill 1 
+[4/15] keep_top  kv   5120 tpot 16.42 ms prefill 1 
+[5/15] drop_top  kv  21504 tpot 14.81 ms prefill 1 
+[6/15] full      kv  25600 tpot 16.45 ms prefill 1 
+[7/15] full      kv  25600 tpot 16.43 ms prefill 1 
+[8/15] none      kv   1024 tpot 5.45 ms prefill 1 
+[9/15] keep_low  kv   5120 tpot 7.43 ms prefill 1 
+[10/15] keep_top  kv   5120 tpot 16.46 ms prefill 1 
+[11/15] none      kv   1024 tpot 5.45 ms prefill 1 
+[12/15] keep_top  kv   5120 tpot 16.42 ms prefill 1 
+[13/15] full      kv  25600 tpot 16.61 ms prefill 1 
+[14/15] drop_top  kv  21504 tpot 14.61 ms prefill 1 
+[15/15] drop_top  kv  21504 tpot 14.56 ms prefill 1 
+          kv_used_before  tpot_ms
+case                             
+drop_top         21504.0    14.61
+full             25600.0    16.45
+keep_low          5120.0     7.41
+keep_top          5120.0    16.42
+none              1024.0     5.45

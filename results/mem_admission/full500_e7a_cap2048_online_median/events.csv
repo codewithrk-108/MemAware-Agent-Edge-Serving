@@ -1,0 +1,7 @@
+t,event,task_id,step,cells
+3012.273611601995,deadlock_discard,agenttrace-mbpp-34-qwen3-1.7b,0,3175
+3614.299613037001,deadlock_discard,agenttrace-mbpp-214-qwen3-1.7b,0,3190
+5558.5875482679985,deadlock_discard,agenttrace-mbpp-399-qwen3-0.6b,0,3239
+6437.233983495011,deadlock_discard,agenttrace-mbpp-363-qwen3-0.6b,0,3326
+6477.290330888005,deadlock_discard,agenttrace-mbpp-372-qwen3-0.6b,0,3338
+6652.661822947004,deadlock_discard,agenttrace-mbpp-401-qwen3-0.6b,0,3342
