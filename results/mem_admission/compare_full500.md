@@ -1,28 +1,31 @@
-| metric | Phase 1 FIFO N4 (baseline) | Phase 1 FIFO N16 | E6: cap 2,048 + lookup order |
-|---|---:|---:|---:|
-| completed | 480/500 | 177/500 | 500/500 |
-| failed | 20 | 323 | 0 |
-| kv_context_failures | 20 | 323 | 0 |
-| tasks_per_min | 4.2 | 4.4 | 3.9 |
-| run_length_min | 113.9 | 40.6 | 129.3 |
-| latency_mean_s | 2,598.0 | 27.7 | 2,056.2 |
-| latency_p50_s | 2,873.6 | 23.7 | 1,277.3 |
-| latency_p90_s | 4,479.1 | 48.9 | 5,291.0 |
-| latency_p95_s | 4,767.6 | 57.8 | 6,111.0 |
-| latency_p99_s | 5,552.6 | 82.7 | 6,947.4 |
-| latency_max_s | 5,862.6 | 102.1 | 7,348.8 |
-| latency_p50_1_step_s | 1,277.6 | 20.2 | 2,422.0 |
-| latency_p50_2_step_s | 3,543.8 | 24.8 | 196.9 |
-| latency_p50_3+_step_s | 4,553.4 | 34.7 | 1,432.3 |
-| latency_p50_mbpp_s | 2,117.9 | 23.1 | 2,834.0 |
-| latency_p50_nl2bash_s | 3,647.0 | 25.4 | 81.5 |
-| ttft_step_p50_s | 0.2 | 0.1 | 0.9 |
-| tpot_p50_ms | 16.6 | 18.6 | 26.3 |
-| prompt_tokens_computed | 1,419,543.0 | 268,394.0 | 3,007,276 |
-| mean_kv_pct | 48.3 | 49.5 | 70.1 |
-| peak_kv_pct | 99.9 | 100.0 | 98.1 |
-| mean_running | 4.0 | 6.4 | 5.6 |
-| continuations | nan | nan | 327 |
-| deadlock_discards | nan | nan | 8 |
-| max_wait_s | nan | nan | 6,477.4 |
-| peak_running | nan | nan | 9 |
+| metric | Phase 1 FIFO N4 (baseline) | Phase 1 FIFO N16 | E6: cap 2,048 + lookup order | E7a: cap 2,048 + online median order | E7b: cap 2,048 + online model order |
+|---|---:|---:|---:|---:|---:|
+| completed | 480/500 | 177/500 | 500/500 | 500/500 | 500/500 |
+| failed | 20 | 323 | 0 | 0 | 0 |
+| kv_context_failures | 20 | 323 | 0 | 0 | 0 |
+| tasks_per_min | 4.2 | 4.4 | 3.9 | 3.8 | 3.7 |
+| run_length_min | 113.9 | 40.6 | 129.3 | 132.3 | 135.0 |
+| latency_mean_s | 2,598.0 | 27.7 | 2,056.2 | 2,209.7 | 2,172.9 |
+| latency_p50_s | 2,873.6 | 23.7 | 1,277.3 | 1,772.9 | 1,522.6 |
+| latency_p90_s | 4,479.1 | 48.9 | 5,291.0 | 5,681.0 | 5,317.2 |
+| latency_p95_s | 4,767.6 | 57.8 | 6,111.0 | 6,331.9 | 6,136.0 |
+| latency_p99_s | 5,552.6 | 82.7 | 6,947.4 | 7,277.2 | 7,133.9 |
+| latency_max_s | 5,862.6 | 102.1 | 7,348.8 | 7,590.9 | 7,849.9 |
+| latency_p50_1_step_s | 1,277.6 | 20.2 | 2,422.0 | 2,081.8 | 2,701.8 |
+| latency_p50_2_step_s | 3,543.8 | 24.8 | 196.9 | 187.8 | 294.5 |
+| latency_p50_3+_step_s | 4,553.4 | 34.7 | 1,432.3 | 4,169.7 | 2,325.5 |
+| latency_p50_mbpp_s | 2,117.9 | 23.1 | 2,834.0 | 2,108.6 | 2,846.0 |
+| latency_p50_nl2bash_s | 3,647.0 | 25.4 | 81.5 | 117.4 | 101.3 |
+| ttft_step_p50_s | 0.2 | 0.1 | 0.9 | 0.9 | 1.0 |
+| tpot_p50_ms | 16.6 | 18.6 | 26.3 | 26.6 | 27.2 |
+| prompt_tokens_computed | 1,419,543.0 | 268,394.0 | 3,007,276 | 2,997,418 | 3,042,953 |
+| mean_kv_pct | 48.3 | 49.5 | 70.1 | 70.0 | 69.8 |
+| peak_kv_pct | 99.9 | 100.0 | 98.1 | 98.0 | 98.0 |
+| mean_running | 4.0 | 6.4 | 5.6 | 5.6 | 5.6 |
+| continuations | nan | nan | 327 | 329 | 326 |
+| deadlock_discards | nan | nan | 8 | 6 | 9 |
+| max_wait_s | nan | nan | 6,477.4 | 7,019.7 | 7,401.9 |
+| peak_running | nan | nan | 9 | 10 | 10 |
+| online_tau_b | nan | nan | nan | 0.3 | 0.3 |
+| requests_with_prediction | nan | nan | nan | 1,031 | 1,032 |
+| online_refits | nan | nan | nan | 52 | 52 |

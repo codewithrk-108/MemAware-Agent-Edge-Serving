@@ -373,6 +373,31 @@ Results (`results/mem_admission/compare_full500.{csv,md}`, run 129 min):
   more often at scale. Latency statistics count completed tasks only, which flatters the baseline (its 20 failures
   are excluded).
 
+## Experiment 7: Exp 4 cap 2,048 ordered by an output-length estimator learned online (500 tasks)
+
+Same as E6 except the ordering key. Nothing is fitted before the run: the estimator (`online_estimator.py`) learns
+only from requests of this run that have completed, using the tokens the server actually generated as the label and
+the features the request had when it became ready (class, step, previous step lengths of this task, tool-result error
+flag and length, history tokens, task text length, number of tests). Until 30 steps have completed, waiting new
+requests are ordered by need (as Exp 4); after that the model is refitted every 20 completions and the new-request
+queue is re-scored. E7a: median per (class, step 0 / 1 / 2+). E7b: gradient-boosted trees on log length.
+The true output length is never used in a scheduling decision. Run with `run_e7_full500.sh` (`/opt/pytorch` Python).
+
+| metric | FIFO N4 (baseline) | E6 lookup | E7a online median | E7b online model |
+|---|---:|---:|---:|---:|
+| completed | 480/500 | 500/500 | 500/500 | 500/500 |
+| tasks/min | 4.21 | 3.87 | 3.78 | 3.70 |
+| latency mean (s) | 2,598 | 2,056 | 2,210 | 2,173 |
+| latency p50 / p95 / max (s) | 2,874 / 4,768 / 5,863 | 1,277 / 6,111 / 7,349 | 1,773 / 6,332 / 7,591 | 1,523 / 6,136 / 7,850 |
+| p50 3+-step tasks (s) | 4,553 | 1,432 | 4,170 | 2,326 |
+| deadlock discards | – | 8 | 6 | 9 |
+| Kendall τ-b of the order | – | 0.33 (offline) | 0.26 | 0.32 |
+| τ-b by quarter of run | – | – | 0.16 / 0.16 / 0.32 / 0.24 | 0.23 / 0.26 / 0.37 / 0.29 |
+
+The online model nearly matches the offline lookup's ranking with no outside data and keeps all of E6's memory
+behaviour (0 failures), but its weaker early ranking leaves median latency between E7a and E6. Full table:
+`results/mem_admission/compare_full500.{csv,md}`; discussion in the lab log, section 27.
+
 ## Files
 
 `results/mem_admission/smoke_exp4_cap{1024,2048,4096,8192}/`: `tasks.csv`, `requests.csv` (one row per chunk: reservation,

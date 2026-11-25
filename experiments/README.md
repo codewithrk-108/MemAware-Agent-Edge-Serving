@@ -19,7 +19,7 @@ one run per configuration, unless stated.
 | LTR-0 | Published Learning-to-Rank predictor (OPT-125M, ShareGPT/Llama-3-8B), zero-shot | How well does it predict / rank our 113 requests' output lengths? | [`ltr_ranking/`](ltr_ranking/README.md) | done: τ 0.24–0.27; with any fitted factor MAE 919–955 vs 978 tokens for a constant. With real earlier outputs (replay, section 20): τ ≤ 0.30, best MAE 925 vs 980 |
 | Exp 6 (E6) | Exp 4 cap 2,048 + class × step length ranking (τ ≈ 0.33) | Does a weak but real length ranking help? | [`mem_admission/`](mem_admission/README.md) | smoke done: **p50 257 → 181 s (below FIFO N4's 225), 68% within 10× of solo (best realistic)**, but p95 695 → 747 s, −4% throughput; mbpp first steps pay. **500 tasks (section 24): 500/500 vs 480/500, p50 2,874 → 1,277 s, p95 4,768 → 6,111 s, −8% throughput** |
 | Online-length | Online output-length estimation (no future data) | How fast does τ improve as history is gathered? | [`online_length/`](online_length/README.md) | done (offline replay): τ 0.31–0.34 after ~150–200 completions, then flat |
-| Exp 7 (E7a, E7b) | Exp 4 cap 2,048 + order by an output-length estimator learned online (median / model), 500 tasks | Does a leak-free, self-learned ranking match or beat the offline lookup (E6)? | [`mem_admission/`](mem_admission/README.md) | E7a done (p50 1,773 s, τ 0.26); E7b running |
+| Exp 7 (E7a, E7b) | Exp 4 cap 2,048 + order by an output-length estimator learned online (median / model), 500 tasks | Does a leak-free, self-learned ranking match or beat the offline lookup (E6)? | [`mem_admission/`](mem_admission/README.md) | done: E7a p50 1,773 s, τ 0.26; E7b p50 1,523 s, τ 0.32 (E6: 1,277 s, 0.33) |
 | C | Idle-KV microbenchmark | Do idle cells in the unified pool slow other requests' decoding? | [`idle_kv_microbench/`](idle_kv_microbench/README.md) | done: yes, ~0.45 ms per 1K cells of occupied range |
 
 ## Shared setup and assumptions
@@ -821,7 +821,53 @@ one run per configuration, unless stated.
   - **Reading:** E7a keeps E6's main gains over FIFO (no failures, p50 −38% vs FIFO), but is worse than E6 on every
     latency figure (p50 +39%, p95 +4%) and slightly lower throughput. The weaker early ranking (τ ≈ 0.16 for the first
     half) costs mostly 3+-step tasks (p50 1,432 → 4,170 s). The leak-free class×step median does not reach the offline
-    lookup's ranking on this run. E7b (model with history features) is running; results pending.
+    lookup's ranking on this run.
+- **E7b result (finished ~10:05 UTC, run `results/mem_admission/full500_e7b_cap2048_online_gbm/`; runner log
+  `results/mem_admission/run_full500_e7.log`; full table `results/mem_admission/compare_full500.{csv,md}`):**
+
+  | metric | FIFO N4 (baseline) | FIFO N16 | E6 lookup | E7a online median | E7b online model |
+  |---|---:|---:|---:|---:|---:|
+  | completed | 480/500 | 177/500 | **500/500** | **500/500** | **500/500** |
+  | tasks/min | **4.21** | (4.36, 65% failed) | 3.87 | 3.78 | 3.70 |
+  | run length (min) | 113.9 | 40.6 | 129.3 | 132.3 | 135.0 |
+  | latency mean (s) | 2,598 | – | **2,056** | 2,210 | 2,173 |
+  | latency p50 (s) | 2,874 | – | **1,277** | 1,773 | 1,523 |
+  | latency p90 / p95 / p99 (s) | **4,479 / 4,768 / 5,553** | – | 5,291 / 6,111 / 6,947 | 5,681 / 6,332 / 7,277 | 5,317 / 6,136 / 7,134 |
+  | latency max (s) | **5,863** | – | 7,349 | 7,591 | 7,850 |
+  | p50 1-step / 2-step / 3+-step (s) | 1,278 / 3,544 / 4,553 | – | 2,422 / 197 / **1,432** | 2,082 / **188** / 4,170 | 2,702 / 295 / 2,326 |
+  | p50 mbpp / nl2bash (s) | **2,118** / 3,647 | – | 2,834 / **81** | 2,109 / 117 | 2,846 / 101 |
+  | TTFT p50 (s) / TPOT p50 (ms) | 0.18 / 16.6 | – | 0.89 / 26.3 | 0.94 / 26.6 | 0.97 / 27.2 |
+  | prompt tokens computed | 1.42 M | – | 3.01 M | 3.00 M | 3.04 M |
+  | mean KV use / mean running | 48% / 4.0 | – | 70% / 5.6 | 70% / 5.6 | 70% / 5.6 |
+  | continuations / deadlock discards | – | – | 327 / 8 | 329 / 6 | 326 / 9 |
+  | max wait (s) | – | – | **6,477** | 7,020 | 7,402 |
+  | Kendall τ-b of the order used | – | – | **0.33** (offline lookup, fitted on non-test tasks) | 0.26 (online) | 0.32 (online) |
+
+  FIFO N16 latencies are over the 177 tasks that survived (323 failed on KV overflow), so they are not comparable.
+
+  Online τ-b by quarter of the run (admission order, ~258 requests each; estimator trained on 30–270 / 270–530 /
+  530–790 / 790–1,050 completed steps):
+
+  | quarter | 1 | 2 | 3 | 4 | whole run |
+  |---|---:|---:|---:|---:|---:|
+  | E7a online median | 0.155 | 0.156 | 0.318 | 0.240 | 0.260 (1,031 requests) |
+  | E7b online model | 0.231 | 0.259 | 0.367 | 0.294 | 0.317 (1,032 requests) |
+
+  - **The model beats the median at every stage of the run** (+0.06 to +0.10 τ per quarter, +0.06 overall), as the
+    offline replay of section 26 predicted. History features (previous step lengths, tool-result error) give it a
+    usable ranking much earlier.
+  - **Latency follows τ:** E7b's p50 (1,523 s) sits between E7a (1,773 s) and E6 (1,277 s); mean and p90 are close to
+    E6. E7b nearly matches E6's τ overall (0.32 vs 0.33) but its weaker first half (0.23–0.26) is when the queue
+    builds up, so it still trails E6 on median.
+  - **Same memory behaviour in all three ordering runs:** 0 failures, ~70% mean KV, ~5.6 running, ~3.0 M prompt tokens
+    (tool-call discards), 326–329 continuations, 6–9 deadlock discards. Ordering changes who waits, not how much is
+    served; throughput is 3.70–3.87 tasks/min in every case (−8 to −12% vs FIFO N4).
+  - **Every memory-aware run trades tail for median vs FIFO:** p50 −38 to −56%, but p95 +28 to +33% and max +25 to
+    +34%. Shortest-predicted-first holds back long mbpp first steps; the tail is those tasks.
+  - **Verdict:** a leak-free online estimator is viable (E7b gets 96% of the offline lookup's τ with no outside data,
+    all tasks complete, p50 −47% vs FIFO), but neither online variant beats E6 on this run. One run per configuration;
+    differences of a few percent between E6 / E7a / E7b are within what one would expect from run-to-run variation
+    in admission order, so only the p50 ranking (E6 < E7b < E7a) and the τ ranking are taken as signal.
 
 ## Results at a glance
 
@@ -838,6 +884,23 @@ one run per configuration, unless stated.
 | Time per output token, p50 (ms) | 16.3 | 16.7 | 19.8 | 23.0 | 29.2 | 24.2 | 18.6 | 11.3 | 24.0 | 24.7 | 25.2 | 26.0 |
 | Mean KV use | 50% | 51% | 57% | 80% | 76% | 66% | 52% | 31% | 65% | 65% | 66% | 65% |
 | Mean running requests | 3.7 | – | 3.7 | 3.6 | 5.3 | 4.8 | 3.6 | 2.2 | 4.5 | 4.7 | 4.7 | 5.0 |
+
+### 50-task smoke set
+
+The table above is the 50-task smoke set.
+
+### 500-task set (same workload as the Phase 1 FIFO N4 baseline; one run each)
+
+| | FIFO N4 (baseline) | E6 (cap 2,048, lookup order) | E7a (cap 2,048, online median) | E7b (cap 2,048, online model) |
+|---|---:|---:|---:|---:|
+| Completed (of 500) | 480 | **500** | **500** | **500** |
+| Tasks/min | **4.21** | 3.87 | 3.78 | 3.70 |
+| Latency mean (s) | 2,598 | **2,056** | 2,210 | 2,173 |
+| Latency p50 / p95 (s) | 2,874 / **4,768** | **1,277** / 6,111 | 1,773 / 6,332 | 1,523 / 6,136 |
+| Latency max (s) | **5,863** | 7,349 | 7,591 | 7,850 |
+| Kendall τ-b of the order | – | **0.33** (offline) | 0.26 (online) | 0.32 (online) |
+
+FIFO N16 (500 tasks) completed only 177/500. Details in section 27 and `results/mem_admission/compare_full500.md`.
 
 \* Exp 4 oracle = reservation `history + true remaining output` (cap 8,192 run of section 15); not achievable
 without knowing output lengths, kept as an upper bound. The oracle-below-cap runs (caps 1,024–4,096, section 15)
@@ -868,8 +931,147 @@ are in [`mem_admission/README.md`](mem_admission/README.md). Bold = best among r
    cut Exp 4's median from 257 to 181 s and lifted tasks within 10× of solo from 48% to 68%, the best realistic
    result so far, by holding back mbpp first steps (predicted long). The tail and that class paid (p95 747 s,
    one-step mbpp tasks 96 → 171 s), the shortest-job-first trade-off.
+9. **On the 500-task set, memory-aware admission plus length ordering wins on completion and median, loses on tail
+   and throughput (E6, E7).** All three ordering runs finished 500/500 (FIFO N4: 480) and cut p50 by 38–56%, but
+   p95 rose ~30% and throughput fell 8–12%.
+10. **A leak-free online estimator nearly matches the offline lookup (E7).** Learning only from this run's completed
+    requests, gradient-boosted trees with history features reached τ 0.32 (offline lookup 0.33) and beat the online
+    class × step median (0.26) in every quarter. Its weak first half still cost median latency (1,523 vs 1,277 s).
+    Better cold-start ranking, not a better steady-state model, is where the remaining gap is.
 8. **Caveats:** all of this is one run per configuration on 50 tasks under overload (12 tasks/min offered vs ~3
    served), with caps chosen in-sample. Sub-capacity loads and the 500-task set are needed before claims.
+
+## Reproducing every experiment (configs and commands)
+
+Every run writes its full configuration to `<run dir>/meta.json` (`run` = scheduler / workload settings,
+`server_args` = exact llama-server command line, `env` = machine and model, `doc` = algorithm text). The tables below
+are copied from those files; when in doubt, `meta.json` is authoritative.
+
+### Common setup (all runs)
+
+| item | value |
+|---|---|
+| GPU / host | NVIDIA T4 (16 GB), EC2, 15.4 GiB RAM, Amazon Linux 2023 (kernel 6.12) |
+| llama.cpp | b11780 with KV instrumentation. Phase 1: `/home/ec2-user/t4runtime/llama-b11780-kv-src/build/bin/llama-server`; Phase 2: same build copied to `/home/ec2-user/bin/llama-server-kv` |
+| model | `/home/ec2-user/Qwen3-0.6B-Q8_0.gguf` (Qwen3-0.6B Q8_0, 639,446,688 bytes) |
+| server flags (all scheduling runs) | `-c 32768 -np <slots> --port 8090 --metrics -ngl 999 -kvu --cache-ram 0 --load-mode none` (+ `--slot-save-path <tmp dir>` when the scheduler erases / saves slots). One unified 32,768-cell KV pool, no host prompt cache, no mmap |
+| decoding | greedy, `ignore_eos`, `n_predict` = the recorded step length (or the cap chunk), so every run generates the same tokens as the trace |
+| workloads | smoke: `data/traces/agenttrace_50_seed2.jsonl` (50 tasks, 113 requests); full: `data/traces/agenttrace_full_500_seed2.jsonl` (500 tasks, 1,068 requests) |
+| arrivals | Poisson, rate 0.2 tasks/s (mean 5 s), seed 2 (identical arrival times across runs on the same trace); tool delays replayed from the trace (`delay_scale` 1.0) |
+| limits | run deadline 21,600 s, per-request timeout 1,800 s (Phase 1 smoke load sweep: 14,400 s / 900 s) |
+| environment | `export MODEL=/home/ec2-user/Qwen3-0.6B-Q8_0.gguf LLAMA_SERVER=/home/ec2-user/bin/llama-server-kv` before every run |
+| Python | repo venv `.venv/bin/python` (or `uv run python`) for runs without scikit-learn; `/opt/pytorch/bin/python3` for E7, `compare_full500.py`, online-length and LTR analyses (scikit-learn, scipy, torch); LTR also needs `PYTHONPATH=~/ltr_pylib` and the checkpoints in `~/models/ltr/` |
+| long runs | launch detached so they survive the terminal / Claude session: `setsid nohup <cmd> > <log> 2>&1 < /dev/null & disown` (section 27, attempt 1 lost) |
+
+All commands are run from the repository root. Run scripts skip any run whose `meta.json` already exists (delete the
+run directory to redo it).
+
+### Per-experiment configuration
+
+| experiment | run dir(s) | trace / tasks | slots (`-np`) | scheduler config (from `meta.json` → `run`) |
+|---|---|---|---:|---|
+| Phase 1 FIFO N4 baseline, 500 (R2) | `results/t4_full500_v1_part_a/t4_full500_v1_c2_n4_poisson5s_ctx32k_seed2/` | full / 500 | 4 | FIFO request scheduler, concurrency 4, `cache_prompt` true, ctx 32,768, `cache_ram` 0, `kv_unified` true, `mmap` false, rate 0.2, seed 2 |
+| Phase 1 FIFO N16, 500 (R3) | `.../t4_full500_v1_c3_n16_poisson5s_ctx32k_seed2/` | full / 500 | 16 | as R2, concurrency 16 |
+| Phase 1 FIFO N1, 500 (R1) | `.../t4_full500_v1_c1_n1_poisson10s_ctx32k_seed2/` | full / 500 | 1 | as R2, concurrency 1, rate 0.1 |
+| Phase 1 smoke load sweep | `results/t4_load_v1_part_b/t4_load_v1_{burst,poisson10s,poisson5s}_n{4,16}_ctx32k_seed2/` | smoke / 50 | 4 / 16 | FIFO, rate 0 (burst) / 0.1 / 0.2, deadline 14,400 s, timeout 900 s |
+| Baseline rerun (smoke) | `results/kv_policy/smoke_baseline_fifo_n4/` | smoke / 50 | 4 | as R2 on the smoke trace |
+| Study A: solo latency | `results/solo_SLO/smoke50_v1/{retain,evict}/` | smoke / 50 | 4 | one task at a time, 3 reps, modes retain / evict, ctx 32,768, seed 2 |
+| Study B: swap / stay / recompute costs | `swap_vs_stay_vs_recompute/data/` | smoke | – | 3 reps, 4 workers, ctx 32,768, port 8091, seed 2 |
+| Study C: idle-KV microbenchmark | `experiments/idle_kv_microbench/data/` | synthetic | – | 3 reps, 256 generated tokens, port 8096, seed 2 (+ `run_range.py`) |
+| Exp 1: KV policy, requeue back | `results/kv_policy/smoke_exp1_policy_back/` | smoke / 50 | 16 | concurrency 4, requeue back; policy capacity 32,768, margin 512, stay max idle 30 s, host budget 50,000 tokens, tool prior 1.3 s, service prior 7.0 s, EMA 0.05 |
+| Exp 2: KV policy, requeue front | `results/kv_policy/smoke_exp2_policy_front/` | smoke / 50 | 16 | as Exp 1, requeue front |
+| Exp 3: MLFQ | `results/mlfq_fastserve/smoke_exp3_mlfq/` | smoke / 50 | 16 | concurrency 4, chunk 256, quanta 256 / 512 / 1,024 / 2,048 / 4,096 / ∞, host budget 50,000, TPOT prior 16 ms, EMA 0.05 |
+| Exp 4 oracle-informed (first runs) | `results/mem_admission/smoke_exp4_cap{1024,2048,4096,8192}/` | smoke / 50 | 32 | cap as named, reserve `min_true` (history + min(cap, true remaining)), margin 512, order need; **uses true length, upper bound only** |
+| Exp 4 fixed cap | `results/mem_admission/smoke_exp4fc_cap{1024,2048,4096,8192}/` | smoke / 50 | 32 | cap as named, reserve `cap` (history + cap), margin 512, order need, no starvation guard |
+| E5a / E5b: starvation guard | `results/mem_admission/smoke_e5_cap2048_starve{60,120}/` | smoke / 50 | 32 | cap 2,048, reserve cap, margin 512, `starve_s` 60 / 120 |
+| E6 smoke: lookup order | `results/mem_admission/smoke_e6_cap2048_lookup/` | smoke / 50 | 32 | cap 2,048, reserve cap, order lookup, `length_lookup.json` (fitted on 2,283 non-smoke requests) |
+| E6 500: lookup order | `results/mem_admission/full500_e6_cap2048_lookup/` | full / 500 | 32 | cap 2,048, reserve cap, order lookup, `length_lookup_full500.json` (fitted on 650 requests of 287 tasks not in the 500 set) |
+| E7a: online median | `results/mem_admission/full500_e7a_cap2048_online_median/` | full / 500 | 32 | cap 2,048, reserve cap, order `online_median`; estimator MIN_FIT 30, REFIT 20, median per (class, step 0/1/2+) |
+| E7b: online model | `results/mem_admission/full500_e7b_cap2048_online_gbm/` | full / 500 | 32 | cap 2,048, reserve cap, order `online_gbm`; MIN_FIT 30, REFIT 20, `HistGradientBoostingRegressor(max_iter=200, learning_rate=0.05, min_samples_leaf=min(30, max(5, n//10)), random_state=0)` on log length, 9 features (section 27) |
+
+(The `lookup` field in E7 `meta.json` shows the default `length_lookup.json`; it is not read when the order is
+`online_*`.)
+
+### Commands
+
+```bash
+cd /home/ec2-user/rohan/MemAware-Agent-Edge-Serving
+export MODEL=/home/ec2-user/Qwen3-0.6B-Q8_0.gguf LLAMA_SERVER=/home/ec2-user/bin/llama-server-kv
+
+# Phase 1 FIFO N4 baseline on 500 tasks (same config as R2; writes results/<group>/<name>/).
+# For N16 use concurrency=16, parallel=16; for the smoke rerun use the 50-task trace and n_tasks=50.
+.venv/bin/python -u - <<'PY'
+from phase1.runner import RunConfig, execute
+from harness.server import ServerConfig
+execute(RunConfig(name="full500_fifo_n4", trace="data/traces/agenttrace_full_500_seed2.jsonl", n_tasks=500,
+                  arrival_rate=0.2, concurrency=4, delay_scale=1.0, cache_prompt=True, deadline_s=21600,
+                  request_timeout_s=1800, scheduler="request", require_kv_metrics=True, seed=2,
+                  server=ServerConfig(ctx=32768, parallel=4, kv_unified=True, cache_ram=0, mmap=False)),
+        group="phase1_repro")
+PY
+
+# Study A (solo latency), ~2 h, resumable
+.venv/bin/python -m experiments.solo_SLO.run_solo --reps 3
+.venv/bin/python -m experiments.solo_SLO.analyze
+# Study B (cost models), ~60 min
+.venv/bin/python -m swap_vs_stay_vs_recompute.measure --reps 3
+.venv/bin/python -m swap_vs_stay_vs_recompute.fit
+# Study C (idle-KV microbenchmark), ~30 min + ~3 min
+.venv/bin/python -m experiments.idle_kv_microbench.run --reps 3
+.venv/bin/python -m experiments.idle_kv_microbench.run_range
+.venv/bin/python -m experiments.idle_kv_microbench.plot
+
+# Baseline rerun + Exp 1 + Exp 2 (smoke), then comparison
+experiments/kv_policy/run_experiments.sh smoke
+#   single runs:
+.venv/bin/python -u -m experiments.kv_policy.runner --name smoke_exp1_policy_back  --requeue back  \
+  --trace data/traces/agenttrace_50_seed2.jsonl --n-tasks 50 --rate 0.2
+.venv/bin/python -u -m experiments.kv_policy.runner --name smoke_exp2_policy_front --requeue front \
+  --trace data/traces/agenttrace_50_seed2.jsonl --n-tasks 50 --rate 0.2
+
+# Exp 3 MLFQ (smoke), ~21 min
+.venv/bin/python -u -m experiments.mlfq_fastserve.scheduler --name smoke_exp3_mlfq \
+  --trace data/traces/agenttrace_50_seed2.jsonl --n-tasks 50 --rate 0.2
+.venv/bin/python -m experiments.mlfq_fastserve.compare
+
+# Exp 4 oracle-informed caps (upper bound only) and fixed caps (smoke)
+experiments/mem_admission/run_caps.sh          # --cap C --reserve min_true is the old default of these runs
+experiments/mem_admission/run_fixed_caps.sh    # = scheduler --name smoke_exp4fc_capC --cap C --reserve cap
+# Exp 5 starvation guard (smoke)
+experiments/mem_admission/run_starvation.sh    # = scheduler --cap 2048 --reserve cap --starve-s 60 | 120
+# E6 lookup order, smoke and 500
+.venv/bin/python -u -m experiments.mem_admission.scheduler --name smoke_e6_cap2048_lookup --cap 2048 --reserve cap \
+  --order lookup --lookup length_lookup.json
+.venv/bin/python -u -m experiments.mem_admission.scheduler --name full500_e6_cap2048_lookup --cap 2048 --reserve cap \
+  --order lookup --lookup length_lookup_full500.json \
+  --trace data/traces/agenttrace_full_500_seed2.jsonl --n-tasks 500 --rate 0.2
+.venv/bin/python -m experiments.mem_admission.compare                       # smoke comparison table
+# E7a then E7b (500), ~2.2 h each, then the 500-task comparison; run detached
+setsid nohup experiments/mem_admission/run_e7_full500.sh > results/mem_admission/run_full500_e7.log 2>&1 < /dev/null & disown
+#   single runs:
+/opt/pytorch/bin/python3 -W ignore -u -m experiments.mem_admission.scheduler --name full500_e7a_cap2048_online_median \
+  --trace data/traces/agenttrace_full_500_seed2.jsonl --n-tasks 500 --rate 0.2 --cap 2048 --reserve cap --order online_median
+/opt/pytorch/bin/python3 -W ignore -u -m experiments.mem_admission.scheduler --name full500_e7b_cap2048_online_gbm \
+  --trace data/traces/agenttrace_full_500_seed2.jsonl --n-tasks 500 --rate 0.2 --cap 2048 --reserve cap --order online_gbm
+/opt/pytorch/bin/python3 -W ignore -m experiments.mem_admission.compare_full500
+
+# Analyses (no server needed unless noted)
+.venv/bin/python experiments/workload_stats/output_length_hist.py
+.venv/bin/python experiments/workload_stats/input_length_hist.py
+/opt/pytorch/bin/python3 -W ignore -m experiments.online_length.simulate
+/opt/pytorch/bin/python3 -W ignore -c "from experiments.online_length.simulate import learning_curve; learning_curve()"
+PYTHONPATH=~/ltr_pylib /opt/pytorch/bin/python3 -W ignore -m experiments.ltr_ranking.opt_zero_shot     # ~2 min
+.venv/bin/python -u -m experiments.ltr_ranking.replay_outputs        # needs the server, ~15 min, resumable
+PYTHONPATH=~/ltr_pylib /opt/pytorch/bin/python3 -W ignore -m experiments.ltr_ranking.opt_with_outputs  # ~1 min
+```
+
+Notes for reproducers:
+- Defaults of `experiments.mem_admission.scheduler`: `--trace` smoke, `--n-tasks 50`, `--rate 0.2`, `--reserve cap`,
+  `--order need`, no `--starve-s`; slots 32, margin 512, ctx 32,768, deadline 21,600 s, timeout 1,800 s, seed 2 are
+  fixed in code. The oracle-informed Exp 4 runs predate `--reserve`; reproduce them with `--reserve min_true`.
+- Output length is used by the harness only to stop generation where the recorded step ended (a real server stops
+  at end-of-sequence); it is never an input to admission, ordering or reservation, except in the oracle runs.
+- Results are single runs; expect run-to-run variation of a few percent in latency from admission-order timing.
 
 ## Where everything is
 
@@ -885,6 +1087,7 @@ they are **not committed** unless force-added (`git add -f`); the ones outside `
 | Exp 4: memory-aware admission | `experiments/mem_admission/scheduler.py`, `run_caps.sh`, `run_fixed_caps.sh`, `compare.py` | `results/mem_admission/smoke_exp4_cap{1024,2048,4096,8192}/` (oracle-informed), `smoke_exp4fc_cap{1024,2048,4096,8192}/` (fixed cap) (`tasks.csv`, `requests.csv`, `reservations.csv`, `dispatches.csv`, `events.csv`, `timeline.csv`, `kv_memory.csv`, `gpu_memory.csv`, `meta.json`, `server.log`), `compare_smoke.{csv,md}` | `results/mem_admission_smoke.log`, `results/mem_admission_smoke_cap8192.log` (oracle-informed), `results/mem_admission_fixed_caps.log` (fixed cap) |
 | Workload stats: output- and input-length histograms (113 requests) | `experiments/workload_stats/output_length_hist.py`, `input_length_hist.py`, [`README.md`](workload_stats/README.md) | `experiments/workload_stats/output_length_hist.png` (median 995, mean 1,590, p75 2,095, p90 3,853, max 7,471; first steps median 1,698, later steps 873; 55 / 30 / 10 requests exceed 1,024 / 2,048 / 4,096), `input_length_hist.png` (new input and full prompt) | – |
 | Exp 6: lookup ordering | `experiments/mem_admission/scheduler.py --order lookup`, `length_lookup.json`, `length_lookup_full500.json`, `compare_full500.py` | `results/mem_admission/smoke_e6_cap2048_lookup/`, `full500_e6_cap2048_lookup/` (Exp 4 files), `compare_full500.{csv,md}`, check `results/mem_admission_checks/check_e6/` | `results/mem_admission/run_e6.log`, `run_full500_e6.log` |
+| Exp 7: online-estimator ordering (500 tasks) | `experiments/mem_admission/scheduler.py --order online_median / online_gbm`, `online_estimator.py`, `run_e7_full500.sh`, `compare_full500.py` (run with `/opt/pytorch/bin/python3`) | `results/mem_admission/full500_e7a_cap2048_online_median/`, `full500_e7b_cap2048_online_gbm/` (Exp 4 files plus `online_model.csv`; `requests.csv` has `pred`, `pred_n`), `compare_full500.{csv,md}`; lost attempt `full500_e7a_interrupted_attempt1/` | `results/mem_admission/run_full500_e7.log`, `run_full500_e7_attempt1_interrupted.log` |
 | Online length estimation (offline replay) | `experiments/online_length/simulate.py` (run with `/opt/pytorch/bin/python3`) | `results/online_length/` (`predictions.csv`, `windows.csv`, `summary.json`, `tau_over_time.png`, `learning_curve.{csv,png}`) | `results/online_length/run.log` |
 | LTR-0: published predictor, zero-shot | `experiments/ltr_ranking/opt_zero_shot.py` (run with `/opt/pytorch/bin/python3`, `PYTHONPATH=~/ltr_pylib`); checkpoint in `~/models/ltr/` | `results/ltr_ranking/opt_zero_shot/` (`predictions.csv`, `errors.csv`, `rank_reference.csv`, `by_step.csv`, `meta.json`) | `results/ltr_ranking/opt_zero_shot/run.log` |
 | LTR step 2: replay + predictor with real outputs | `experiments/ltr_ranking/replay_outputs.py`, `opt_with_outputs.py` | `results/ltr_ranking/replay_outputs/` (`outputs.jsonl`: generated token ids per step), `results/ltr_ranking/opt_with_outputs/` (`predictions.csv`, `errors.csv`, `by_step.csv`, `tau_with_vs_without_outputs.csv`, `meta.json`) | `results/ltr_ranking/replay_outputs.log` and `replay_outputs_attempt{2_failed,3_livelock,4_interrupted}.log`, `opt_with_outputs/run.log` |
