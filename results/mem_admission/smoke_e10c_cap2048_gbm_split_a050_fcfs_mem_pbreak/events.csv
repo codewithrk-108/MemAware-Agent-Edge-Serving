@@ -1,0 +1,7 @@
+t,event,partition,task_id,step,cells
+416.95452061097603,deadlock_discard,F,agenttrace-mbpp-308-qwen3-1.7b,0,3291
+534.4447018879582,deadlock_discard,P,agenttrace-mbpp-349-qwen3-0.6b,0,3143
+582.0088094469975,deadlock_discard,P,agenttrace-mbpp-413-qwen3-0.6b,0,3350
+694.134521771979,deadlock_discard,P,agenttrace-mbpp-308-qwen3-1.7b,1,6111
+953.902269810962,oversized_fail,,agenttrace-mbpp-55-qwen3-1.7b,2,16764
+999.1457072499907,oversized_fail,,agenttrace-mbpp-454-qwen3-1.7b,10,16842

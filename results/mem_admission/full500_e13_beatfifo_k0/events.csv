@@ -1,0 +1,7 @@
+t,event,partition,task_id,step,cells
+764.9123623030027,deadlock_discard,,agenttrace-mbpp-171-qwen3-0.6b,0.0,3149
+764.9149349629879,leftover_erase,,,,3149
+806.4209340210073,deadlock_discard,,agenttrace-mbpp-323-qwen3-0.6b,0.0,7389
+806.426131227985,leftover_erase,,,,7389
+2846.9957784019643,leftover_erase_finished,,,,4710
+7554.927705745969,leftover_erase_finished,,,,5542

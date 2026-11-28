@@ -20,6 +20,17 @@ one run per configuration, unless stated.
 | Exp 6 (E6) | Exp 4 cap 2,048 + class × step length ranking (τ ≈ 0.33) | Does a weak but real length ranking help? | [`mem_admission/`](mem_admission/README.md) | smoke done: **p50 257 → 181 s (below FIFO N4's 225), 68% within 10× of solo (best realistic)**, but p95 695 → 747 s, −4% throughput; mbpp first steps pay. **500 tasks (section 24): 500/500 vs 480/500, p50 2,874 → 1,277 s, p95 4,768 → 6,111 s, −8% throughput** |
 | Online-length | Online output-length estimation (no future data) | How fast does τ improve as history is gathered? | [`online_length/`](online_length/README.md) | done (offline replay): τ 0.31–0.34 after ~150–200 completions, then flat |
 | Exp 7 (E7a, E7b) | Exp 4 cap 2,048 + order by an output-length estimator learned online (median / model), 500 tasks | Does a leak-free, self-learned ranking match or beat the offline lookup (E6)? | [`mem_admission/`](mem_admission/README.md) | done: E7a p50 1,773 s, τ 0.26; E7b p50 1,523 s, τ 0.32 (E6: 1,277 s, 0.33) |
+| Exp 8 (T = 120 / 240 / 600 s) | E7b + Exp 5 fixed starvation guard, 500 tasks | Does a fixed per-request wait bound fix E7b's tail without losing its median? | [`mem_admission/`](mem_admission/README.md) | done: no at any T; guard collapses to FIFO (77–92% starving), p50 1,523 → ~3,300 s, p95 6,136 → ~5,600–5,750 s, max wait 7,402 → ~2,650 s; T=360 stopped |
+| Exp 10 (α = 0.5, FIFO ×2) | Split KV pool: E7b order in partition P, ready-time FIFO (≤ 2 in flight, strict) in partition F; oversized requests fail; 500 tasks | Can a FIFO share bound the tail while the E7b share keeps the median? | [`mem_admission/`](mem_admission/README.md) | stopped by user at 220 / ~1,403 requests (slow, ~5.7 req/min vs E7b ~10.5); no result |
+| Exp 10b (α = 0.5, memory-aware FCFS) | As Exp 10 but partition F is memory-aware FCFS with no concurrency limit (strict, ready-time order); oversized requests fail; 500 tasks | Does filling F's half fix Exp 10's idle memory and bound the tail? | [`mem_admission/`](mem_admission/README.md) | done, invalid: 496/500, p50 5,243 s, p95 12,125 s, 2.0 tasks/min; P deadlocked for 164 min because the deadlock breaker was not partition-aware; rerun as E10c pending |
+| Exp 10c (α = 0.5, per-partition deadlock breaker) | E10b plus a per-partition deadlock breaker (`--split-breaker partition`); smoke first | Does the split help once P can no longer freeze? | [`mem_admission/`](mem_admission/README.md) | smoke done: 48/50 (2 oversized), p50 198 s, p95 697 s, 2.88 tasks/min; no partition freeze; 500-task done: 496/500, p50 2,242 s, p95 5,814 s, p99 7,190 s, 3.65 tasks/min; between E7b and E8, no p99 gain |
+| Exp 11 (slot reuse) | E7b, but finished caches stay in their slot as leftovers; scheduler picks the slot with the longest shared prefix; LRU leftovers erased only when the pool would overflow; smoke + E7b control on the rebuilt binary | Does reusing slot caches (as FIFO N4 does via cache_prompt) cut prefill and latency? | [`mem_admission/`](mem_admission/README.md) | smoke done: 50/50, reuse 57.6% vs 35.8%, p50 219 vs 227 s, p95 713 vs 825 s; slot-choice flaw: only 9 of 32 slots used, 50/63 returning steps lost their own slot to another task (corrected from 54) |
+| Exp 11b (own-first slot order) | E11 with slot order own leftover > finished task's leftover > empty > LRU live leftover | Does protecting live tasks' histories raise reuse? | [`mem_admission/`](mem_admission/README.md) | smoke done: 50/50, reuse 57.1% (no gain), p50/p95 233/679 s; own-slot reuse 4→11, but the memory guard erased 52/63 returning steps' histories: cap reservations leave ~3.6K cells for leftovers |
+| Exp 11c (finished-first guard) | E11b + memory guard erases finished tasks' leftovers first | Does protecting live histories in the guard raise reuse? | [`mem_admission/`](mem_admission/README.md) | smoke done: 50/50, reuse 45.7%, p50/p95 223/764 s, no gain; only 6/65 erases hit finished leftovers; histories survive only if the task returns within seconds |
+| Exp 12 (≤ 4 running) | E11b + at most 4 requests running at once, 500 tasks | Does matching FIFO N4's concurrency recover decode speed? | [`mem_admission/`](mem_admission/README.md) | done: 500/500 but p50/p95/p99 2,750/7,193/7,786 s, 3.47 tasks/min (worse than E11b); prefill 1.09 M (lowest), own-slot hits 386/568; leftovers keep KV at 65%, TPOT 20.7 ms: idle cells slow decode |
+| Exp 13 ("beat FIFO N4") | -np 4, memory-aware admission, order by task arrival + K·min(pred, 2,048), own-first slot reuse; K chosen on smokes (K=0) | Can a memory-aware scheduler beat FIFO N4 on every metric? | [`mem_admission/`](mem_admission/README.md) | 500 tasks: wins completion (496 vs 480), p50, p99, max; loses p95 (+1.6%), mean (+3.9%), tasks/min (−6.4%); 4 failures from a guard bug (§33) |
+| SLO benchmark, 500 tasks (FIFO N4 vs E11b, 3 runs each) | Same seed ×3 per system, interleaved; solo base 500 tasks × 3 reps, retain mode; slowdown = completion / solo | Per-task SLO attainment and segregations, averaged over runs | [`mem_admission/`](mem_admission/README.md) | E11b wins: SLO 100× 63.1 vs 33.9%, slowdown p50 56 vs 153×, 324/500 tasks better, 500 vs 477 completed; every segment except 1-step tasks. FIFO N4 wins p95/p99 latency (−19%/−18%) and tasks/min (4.1 vs 3.9) (§34) |
+| Exp 11b, 500 tasks | E11b on the full 500-task set | Does slot reuse help at scale? | [`mem_admission/`](mem_admission/README.md) | done: 500/500, p50/p95/p99 1,604/5,958/7,003 s (E7b 1,523/6,136/7,134; FIFO N4 2,874/4,768/5,553), 3.85 tasks/min, prefill −18%; only 18/568 histories survived tool calls |
 | C | Idle-KV microbenchmark | Do idle cells in the unified pool slow other requests' decoding? | [`idle_kv_microbench/`](idle_kv_microbench/README.md) | done: yes, ~0.45 ms per 1K cells of occupied range |
 
 ## Shared setup and assumptions
@@ -869,6 +880,1128 @@ one run per configuration, unless stated.
     differences of a few percent between E6 / E7a / E7b are within what one would expect from run-to-run variation
     in admission order, so only the p50 ranking (E6 < E7b < E7a) and the τ ranking are taken as signal.
 
+### 28. Exp 8: E7b plus a fixed starvation guard, T = 120 / 240 / 360 s, 500-task set (2026-11-25)
+
+- **Request (user):** "implement the starvation safeguards on top of E7b"; then "just perform E8a: fixed guard FULL
+  RUN, start now"; then "keep 120s and 240s and 360s starving threshold ... 3 full 500 runs sequentially using a script
+  ... background run so that it doesnt stop".
+- **Proposal made first** (fixed guard E8a, adaptive one-at-a-time guard E8b, smoke tests with an E7b-smoke control).
+  The user chose the fixed guard only, on the full 500-task set, at three thresholds. E8b and the smoke runs were not
+  run.
+- **Algorithm:** E7b unchanged (cap 2,048, reservation history + cap, continuations first, online gradient-boosted
+  length model ordering, deadlock breaker) plus the Exp 5 guard (no new scheduler code; `--starve-s T` composes with
+  `--order online_gbm`):
+  1. each new request has a queue-wait clock from the moment it becomes ready (task arrival or tool return); running
+     time and tool time do not count; the clock restarts every step;
+  2. at every dispatch event a waiting new request with wait >= T is marked starving (until admitted);
+  3. order: continuations first; then starving requests, oldest first, and if the oldest does not fit no other new
+     request is admitted (head-of-line block; a request larger than the whole pool never blocks); only when no request
+     is starving, other new requests by predicted length (E7b).
+  The true output length is not used.
+- **Expectation stated before the run:** in E7b, 43% of new requests waited >= 120 s and 30% >= 600 s (median 52 s,
+  p90 3,851 s), so at T = 120 s the guard will be active much of the time and admission will be close to FIFO with
+  head-of-line blocking: lower max wait and maybe p95, at the cost of p50 and throughput (the Exp 5 trade-off). Larger
+  T should trigger less.
+- **Metric note (user question):** latency p50 / p95 in all 500-task tables is **task completion** (arrival to end of
+  the last step, including queue waits, tool time and re-prefill; from `tasks.csv`, failed tasks excluded); waits,
+  TTFT and TPOT are per request.
+- **Runs** (`results/mem_admission/`): `full500_e8a_cap2048_online_gbm_starve120/` (launched 10:20 UTC by
+  `run_e8a_full500.sh`, log `run_full500_e8a.log`), then `full500_e8_cap2048_online_gbm_starve240/` and
+  `full500_e8_cap2048_online_gbm_starve360/` by `run_e8_full500.sh` (log `run_full500_e8.log`), which waits for the
+  T = 120 s run, runs 240 and 360 one after another, then `compare_full500.py` (now also reports
+  `starving_promotions`, `starving_admissions`, `starve_blocked_s`). Both launchers run detached
+  (`setsid nohup ... & disown`). ~2.2 h per run; all three expected by ~17:00 UTC.
+- **Results for T = 120 s and T = 240 s (finished 12:42 and 14:56 UTC; T = 360 s still running at 15:46 UTC):**
+
+  | metric (task completion unless noted) | FIFO N4 | E6 | E7b | E8 T=120 | E8 T=240 |
+  |---|---:|---:|---:|---:|---:|
+  | completed | 480/500 | 500/500 | 500/500 | 500/500 | 500/500 |
+  | tasks/min | 4.21 | 3.87 | 3.70 | 3.77 | 3.73 |
+  | latency mean (s) | 2,598 | 2,056 | 2,173 | 3,007 | 3,028 |
+  | latency p50 (s) | 2,874 | 1,277 | 1,523 | 3,458 | 3,331 |
+  | latency p90 / p95 / p99 (s) | 4,479 / 4,768 / 5,553 | 5,291 / 6,111 / 6,947 | 5,317 / 6,136 / 7,134 | 5,113 / 5,758 / 6,738 | 5,194 / 5,654 / 6,883 |
+  | latency max (s) | 5,863 | 7,349 | 7,850 | 7,449 | 7,619 |
+  | p50 1-step / 2-step / 3+-step (s) | 1,278 / 3,544 / 4,553 | 2,422 / 197 / 1,432 | 2,702 / 295 / 2,326 | 1,439 / 3,940 / 5,095 | 1,429 / 4,060 / 5,168 |
+  | p50 mbpp / nl2bash (s) | 2,118 / 3,647 | 2,834 / 81 | 2,846 / 101 | 2,393 / 4,019 | 2,434 / 4,097 |
+  | per-request queue wait p50 / p90 / p99 / max (s) | – | – / – / – / 6,477 | 52 / 3,851 / 5,825 / 7,402 | 1,436 / 2,400 / 2,660 / 2,689 | 1,435 / 2,444 / 2,678 / 2,716 |
+  | new requests admitted as starving | – | 0 | 0 | 987 (92%) | 934 (87%) |
+  | time new admissions were blocked by a starving request (s) | – | 0 | 0 | 6,004 | 5,891 |
+  | deadlock discards | – | 8 | 9 | 4 | 2 |
+  | online τ-b | – | 0.33 (offline) | 0.32 | 0.33 | 0.32 |
+
+  - **As predicted, the guard turned the scheduler into FIFO.** 87–92% of new requests were admitted as starving and
+    admissions were blocked by a starving head-of-line request for ~6,000 s of a ~8,000 s run. The length model kept
+    ranking just as well (τ 0.32–0.33) but was almost never consulted.
+  - **What it bought:** the per-request wait is bounded and flat (max 7,402 → ~2,700 s; p99 5,825 → ~2,670 s), and the
+    task tail improved a little versus E7b (p95 6,136 → 5,654–5,758 s; p99 −2 to −6%). It is still worse than FIFO N4's
+    p95 (4,768 s), because tasks still re-prefill after every tool call.
+  - **What it cost:** typical latency more than doubled (p50 1,523 → 3,331–3,458 s; mean +38%), now worse than FIFO N4
+    (2,874 s). Every waiting request now waits ~1,400 s (median), where E7b let most go in ~50 s and made a few wait
+    very long. Short multi-step nl2bash tasks lose most (p50 101 → ~4,000 s); one-step tasks gain (2,702 → ~1,430 s).
+  - **120 vs 240 s barely differ:** under this load the median wait (~1,400 s) is far above both thresholds, so both
+    are effectively "always on". A per-request wait threshold only works if it sits above the typical wait; here
+    that is > 1,400 s, which gives no protection. Same lesson as Exp 5 on the smoke set, now at full scale.
+- **Interim conclusion:** a fixed per-request starvation guard is the wrong tool for agent tasks under sustained
+  overload; tail latency comes from the number of queueings per task and from re-prefill, not from a few requests
+  waiting too long. Options not yet tried: a load-adaptive threshold limited to one promoted request at a time (E8b
+  as proposed), or task-level aging (priority grows with the task's total time in system).
+- **T = 360 s stopped, replaced by T = 600 s (user, 2026-11-25 ~15:50 UTC):** "stop the 360 run and instead start a
+  600 s run". The 360 s run was stopped at 655 of ~1,403 requests (no results files; only `server.log`, kept as
+  `results/mem_admission/full500_e8_starve360_stopped_by_user/`, launcher log `run_full500_e8_360_stopped.log`). Stopping
+  the scheduler left its llama-server running; it was killed separately (GPU back to 0 MiB). `run_e8_full500.sh` now
+  sweeps 120 / 240 / 600 (finished runs skipped) and `compare_full500.py` lists T = 600 instead of 360. T = 600 s
+  (`full500_e8_cap2048_online_gbm_starve600/`) started 15:56 UTC, detached; expected ~18:10 UTC. Rationale: 600 s
+  is closer to the ~1,400 s median wait seen at 120 / 240 s, so the guard should trigger less often.
+- **Final E8 results, all three thresholds (T = 600 s finished ~18:15 UTC; full table
+  `results/mem_admission/compare_full500.{csv,md}`, run log `results/mem_admission/run_full500_e8.log`):**
+
+  | metric (task completion unless noted) | FIFO N4 | E6 | E7b | E8 T=120 | E8 T=240 | E8 T=600 |
+  |---|---:|---:|---:|---:|---:|---:|
+  | completed | 480/500 | 500/500 | 500/500 | 500/500 | 500/500 | 500/500 |
+  | tasks/min | **4.21** | 3.87 | 3.70 | 3.77 | 3.73 | 3.78 |
+  | latency mean (s) | 2,598 | **2,056** | 2,173 | 3,007 | 3,028 | 2,870 |
+  | latency p50 (s) | 2,874 | **1,277** | 1,523 | 3,458 | 3,331 | 3,289 |
+  | latency p90 / p95 / p99 (s) | **4,479 / 4,768 / 5,553** | 5,291 / 6,111 / 6,947 | 5,317 / 6,136 / 7,134 | 5,113 / 5,758 / 6,738 | 5,194 / 5,654 / 6,883 | 5,100 / 5,600 / 6,799 |
+  | latency max (s) | **5,863** | 7,349 | 7,850 | 7,449 | 7,619 | 7,371 |
+  | p50 1-step / 2-step / 3+-step (s) | 1,278 / 3,544 / 4,553 | 2,422 / **197** / **1,432** | 2,702 / 295 / 2,326 | 1,439 / 3,940 / 5,095 | 1,429 / 4,060 / 5,168 | 1,390 / 3,949 / 5,085 |
+  | p50 mbpp / nl2bash (s) | 2,118 / 3,647 | 2,834 / **81** | 2,846 / 101 | 2,393 / 4,019 | 2,434 / 4,097 | 2,389 / 3,987 |
+  | per-request wait p50 / p90 / p99 / max (s) | – | – / – / – / 6,477 | 52 / 3,851 / 5,825 / 7,402 | 1,436 / 2,400 / 2,660 / 2,689 | 1,435 / 2,444 / 2,678 / 2,716 | 1,380 / 2,380 / 2,617 / **2,634** |
+  | new requests admitted as starving | – | 0 | 0 | 987 (92%) | 934 (87%) | 825 (77%) |
+  | admissions blocked by a starving request (s) | – | 0 | 0 | 6,004 | 5,891 | 5,038 |
+  | deadlock discards | – | 8 | 9 | 4 | 2 | 4 |
+  | online τ-b | – | 0.33 (offline) | 0.32 | 0.33 | 0.32 | 0.33 |
+
+  - **Even at T = 600 s the guard is on most of the time (77% of requests starving, blocked 5,038 s).** Raising the
+    threshold five-fold only moved the starving share from 92% to 77%; all three runs land at the same operating point
+    (p50 ~3,300 s, p95 ~5,600–5,750 s, wait max ~2,650 s).
+  - **Why the threshold barely matters — the guard feeds itself:** once one request starves it blocks every other
+    new admission (head-of-line), so everyone else's wait grows past T too; the queue becomes FIFO and the median wait
+    settles at ~1,400 s, above any of the thresholds tried. E7b without the guard had a median wait of 52 s; the guard
+    raises it to ~1,400 s. A fixed per-request threshold below the overloaded FIFO wait is self-fulfilling.
+  - **Net effect vs E7b:** p95 −9% (6,136 → 5,600 s at T = 600), p99 −5%, max wait −64% (7,402 → 2,634 s), but p50
+    +116% (1,523 → 3,289 s) and mean +32%. Versus FIFO N4: all tasks complete, but p50 is 14% worse and p95 17% worse.
+    The guard hands back E6/E7's median gain without reaching FIFO's tail.
+- **Conclusion (Exp 8):** a fixed per-request starvation guard with head-of-line blocking does not work for agent
+  tasks under sustained overload at any threshold from 120 to 600 s; it collapses into FIFO-with-blocking. Bounding
+  the tail without losing the median needs a guard that cannot cascade: promote at most one request at a time and
+  without blocking all others (E8b as proposed), or task-level aging, or admission control (rejecting / deferring
+  tasks) since the offered load (12 tasks/min) is ~3× what the server sustains (~3.8).
+
+- **Reproduce:** `setsid nohup experiments/mem_admission/run_e8_full500.sh > results/mem_admission/run_full500_e8.log
+  2>&1 < /dev/null & disown`, or a single run: `/opt/pytorch/bin/python3 -W ignore -u -m
+  experiments.mem_admission.scheduler --name full500_e8_cap2048_online_gbm_starve<T> --trace
+  data/traces/agenttrace_full_500_seed2.jsonl --n-tasks 500 --rate 0.2 --cap 2048 --reserve cap --order online_gbm
+  --starve-s <T>`.
+
+### 29. Analysis: would one-request-at-a-time serving beat all experiments? (2026-11-25)
+
+- **Question (user):** "based on the standalone experiment ... by calculating the time for each standalone request to
+  run on llama.cpp, can we say that if we would have sent individual requests one by one the metrics would have been
+  better than all these exps".
+- **Method:** `experiments/one_at_a_time/simulate.py` (run with `/opt/pytorch/bin/python3 -m
+  experiments.one_at_a_time.simulate`; output `results/one_at_a_time/summary.csv`, `run.log`). Replays the 500-task
+  workload (same arrivals as FIFO N4: Poisson mean 5 s, seed 2) on a simulated one-request server. Service time of
+  each request = its measured end-to-end time in Phase 1 R1 (FIFO N1 on the same T4 / build / model, every request ran
+  alone). Tool delays from the trace. Policies: FIFO by ready time, and oracle shortest-service-first (true lengths;
+  a bound only). The Study A solo runs only cover the 50-task smoke set, so R1 is the solo source for the 500 set.
+  Caveat: R1 service times include prefix-cache hits when a task's steps ran back to back on the single slot, so the
+  simulation is optimistic for N1.
+- **Result:**
+
+  | 500 tasks, offered 12 tasks/min | completed | tasks/min | mean (s) | p50 (s) | p95 (s) | p99 (s) | max (s) |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | N1 FIFO (simulated) | 500 | 2.71 | 5,242 | 6,705 | 8,940 | 9,956 | 10,604 |
+  | N1 oracle shortest-first (simulated bound) | 500 | 2.71 | 2,360 | 1,100 | 8,251 | 9,985 | 10,884 |
+  | Phase 1 R1, N1 FIFO measured at **half** the load (rate 0.1) | 500 | 2.70 | – | 4,029 | 7,351 | 9,076 | – |
+  | FIFO N4 (measured) | 480 | 4.21 | 2,598 | 2,874 | 4,768 | 5,553 | 5,863 |
+  | E6 (measured) | 500 | 3.87 | 2,056 | 1,277 | 6,111 | 6,947 | 7,349 |
+  | E7b (measured) | 500 | 3.70 | 2,173 | 1,523 | 6,136 | 7,134 | 7,850 |
+
+- **Answer: no.** Each request alone is fastest (TPOT ~6 ms vs ~26 ms under batching), but the server then sustains
+  only 2.71 tasks/min (11,086 s of solo service for 500 tasks) against 12 offered, versus 3.7–4.2 with 4–10 requests
+  batched. Under overload, throughput decides queueing, so one-at-a-time is worse on every measure except
+  completion: FIFO N1 p50 6,705 s (2.3× FIFO N4, 5× E6), p95 8,940 s. Even the oracle shortest-first bound, which a
+  real server cannot achieve, only beats E6's median (1,100 vs 1,277 s) while its p95 (8,251 s) and mean are far worse.
+  The solo latency (Study A) is a per-task lower bound when the server is empty, not an achievable operating point
+  for all tasks under load; it is used here only as the yardstick for slowdown.
+
+### 30. Exp 10: split KV pool, E7b partition + FIFO partition, 500-task set (2026-11-25/26)
+
+- **Request (user):** "can I make best of both worlds E7b and FIFO ... divide the GPU into two memory partitions say in
+  alpha ratio, for now alpha=0.5 ... in half of it the E7a type of algo runs (priority in choosing the processes) and
+  in second partition (once the E7a partition is full and running then we go to this) we choose the processes in the
+  queue in ascending order of their arrival ... I think that the p95 and p99 will improve and some tradeoff for p50".
+  Follow-ups: "keep concurrency 2 in the FIFO partition"; then the final spec: P = the E7b side ("best of E7b and
+  FIFO"), F order = **(b) when the step became ready (as FIFO N4)**, F strict (waits if the oldest does not fit), and
+  "if the request input tokens or the input+output tokens become greater than the FIFO partition or the E7b partition
+  then you can fail the request and hence that task"; "put up a detached run on 500 set".
+- **Discussion before the final spec:** Claude first proposed F by task arrival (a task in a tool call is not a
+  candidate and gets its place back when its next step is ready) and letting oversized requests borrow both
+  partitions; the user chose ready time and failing oversized requests instead. Both were implemented as the user
+  specified.
+- **Algorithm** (`scheduler.py --order online_gbm --alpha 0.5 --fifo-conc 2`; docstring "Experiment 10"):
+  1. one llama.cpp pool (32,768 cells, `-np 32`); the scheduler splits the usable 32,256 cells into P = 16,128 and
+     F = 16,128. All running requests are still batched together on the GPU.
+  2. each admitted request belongs to the partition that admitted it; its reservation (history + cap 2,048) and,
+     while it waits as a continuation, its resident cells count against that partition.
+  3. oversized: a waiting request whose reservation (history + 2,048, or resident + 2,048 for a continuation)
+     exceeds the smaller partition (16,128) is failed, and its task with it (event `oversized_fail`). 3 of the 1,068
+     requests in the 500-task trace exceed it on arrival (by history alone; more can only arise through
+     continuations). Output length is not known, so "input + output" is the reservation, history + cap.
+  4. dispatch on every event: (i) continuations first in their own partition; a waiting continuation that does not
+     fit blocks new admissions in its own partition only; (ii) P admits new requests in E7b order (shortest
+     predicted output from the online model; need order until it has 30 completions), with backfill; (iii) F admits
+     the remaining new requests in ascending ready time (task arrival for a first step, tool return for later
+     steps), at most 2 F requests in flight (running + waiting F continuations), strict head-of-line; (iv) deadlock
+     breaker unchanged.
+  5. tool calls discard the cache as before; the next step can be taken by either partition. No starvation guard.
+     True output length never used.
+- **Offline checks of the dispatch code** (stub server, 60 first steps waiting at once): P admitted 5 requests
+  (15,664 / 16,128 cells); F admitted exactly the 2 earliest-ready requests not taken by P; an F request that became
+  a continuation kept its in-flight place and cells and was readmitted with +2,048 cells in F; an artificially
+  oversized request (18,238 cells) was failed with its task.
+- **Expectation stated before the run:** with at most 2 requests, F will typically hold ~4–8K of its 16K cells; P cannot
+  use the rest, so throughput may fall below E7b. A smaller α would give P more room; α = 0.5 is the user's choice.
+- **Disk incident at launch (2026-11-26 00:22 UTC):** the root disk was at 100% (44 MB free) because a VS Code
+  extension update left a 190 MB installer in `~/.vscode-server/data/CachedExtensionVSIXs/.trash/`. Deleting it freed
+  nothing (VS Code still holds it open). `sudo dnf clean all` (package cache, re-downloadable) freed ~200 MB → 238 MB
+  free; a 500-task run writes ~10 MB. The run was not affected.
+- **Run:** `results/mem_admission/full500_e10_cap2048_gbm_split_a050_fifo2/`, launched detached 00:21 UTC 2026-11-26
+  by `experiments/mem_admission/run_e10_full500.sh` (log `results/mem_admission/run_full500_e10.log`), followed by
+  `compare_full500.py` (now also `admitted_by_P`, `admitted_by_F`, `oversized_fails`). Expected ~02:40 UTC.
+- **Stopped by the user (2026-11-26 ~01:00 UTC):** "ok stop the run". At 00:58 UTC it had processed 212 requests in
+  37 min (~5.7 requests/min vs E7b's ~10.5/min run average; the early part of a run, while tasks still arrive, is not
+  fully comparable), consistent with F's unused cells lowering concurrency. Stopped at 220 of ~1,403 requests; no
+  results files were written (only `server.log`), kept as `results/mem_admission/full500_e10_stopped_by_user/`,
+  launcher log `run_full500_e10_stopped.log`. Launcher, scheduler and llama-server stopped; GPU back to 0 MiB.
+  No result for E10.
+- **E10b (user, 2026-11-26):** "run E10 again with alpha 0.5 on 500 set ... but this time in FCFS partition it must be
+  memory aware FCFS, which keeps a fixed output token budget of 2048 (as in e7b) but other things remain constant. i
+  think this will avoid the empty space and lack of consumption"; then "if in case the requests total budget
+  overflows partition space limit, you can fail that request and fail that task" (already implemented as rule 3:
+  history + 2,048, or resident + 2,048 for a continuation, above the partition size of 16,128 cells → request and
+  task fail; a request that fits the partition but not its current free space waits, it is not failed).
+  - Only change from E10: F has no in-flight limit (`--fifo-conc 32` = all slots). F admits in ascending ready time
+    while history + 2,048 fits in F's free cells, strict (waits if the oldest does not fit). P unchanged (E7b order,
+    backfill). No code change.
+  - Run `results/mem_admission/full500_e10b_cap2048_gbm_split_a050_fcfs_mem/`, launched detached ~01:05 UTC by
+    `experiments/mem_admission/run_e10b_full500.sh` (log `results/mem_admission/run_full500_e10b.log`), then
+    `compare_full500.py` (E10b replaces the stopped E10 entry). Finished; results below (final check, 06:45 UTC).
+  - Interim check (01:20 UTC, 219 requests, from `server.log` only; first 219 requests of each run): E7b 14.7 min
+    (14.9 req/min, 259 generated tok/s, TPOT p50 26.2 ms); E10 (F ×2, stopped) 38.4 min (5.7 req/min, 121 tok/s,
+    16.1 ms); E10b 17.9 min (12.2 req/min, 210 tok/s, 23.8 ms). Removing F's 2-request limit restored most of the
+    throughput (+74% tok/s vs E10) but E10b is still ~19% below E7b in this early window, with lower TPOT, i.e.
+    fewer requests running (likely F's strict head-of-line waits). Early-window only; final numbers pending.
+  - Second check (03:15 UTC, 944 of ~1,403 requests, 2 h 13 min in): over the first 944 requests E7b took 74 min
+    (223 generated tok/s, TPOT p50 27.9 ms) and E10b 133 min (134 tok/s, TPOT p50 23.3 ms): E10b is ~40% lower in
+    token throughput, and the gap widened after the early window. Lower TPOT again means fewer requests running; the
+    split pool plus F's strict head-of-line rule is leaving KV unused. Expected finish ~04:30 UTC instead of ~03:15.
+  - **Final result (run 245.4 min; `results/mem_admission/compare_full500.md`). E10b is the worst 500-task run so far.**
+
+    | metric | FIFO N4 | E7b | E8 T=600 | E10b |
+    |---|---:|---:|---:|---:|
+    | completed | 480/500 | 500/500 | 500/500 | 496/500 |
+    | tasks/min | 4.2 | 3.7 | 3.8 | 2.0 |
+    | run length (min) | 113.9 | 135.0 | 132.2 | 245.4 |
+    | latency p50 (s) | 2,874 | 1,523 | 3,289 | 5,243 |
+    | latency p95 (s) | 4,768 | 6,136 | 5,600 | 12,125 |
+    | latency p99 (s) | 5,553 | 7,134 | 6,799 | 13,621 |
+    | max request wait (s) | – | 7,402 | 2,634 | 9,853 |
+    | mean running | 4.0 | 5.6 | 5.4 | 2.6 |
+    | mean KV % | 48.3 | 69.8 | 67.9 | 79.6 |
+    | TPOT p50 (ms) | 16.6 | 27.2 | 25.6 | 22.9 |
+    | continuations / deadlock discards | – | 326 / 9 | 331 / 4 | 298 / 35 |
+
+    Admissions: 635 by P, 763 by F. 4 tasks failed as oversized (all mbpp, reservations 16,575–17,543 cells >
+    16,128-cell partition; at steps 0, 1, 10, 10). Hypothesis (better p95/p99 for some p50) rejected: every
+    percentile is roughly 2x worse than E7b and FIFO N4.
+  - **Why: partition P froze for 164 minutes because of an implementation flaw (found 2026-11-26 after a user question).**
+    Time-weighted from `reservations.csv`, P had 15.6K of 16.1K cells reserved but only 1.1 running on average, and
+    was idle 67% of the run. That was not spread over the run; it was one episode. At t = 4,851 s (81 min in), two P
+    continuations (step chunks that hit the 2,048 cap, e.g. mbpp-383 step 1 with a 5.9K prompt) held 15,835 P cells
+    between them, about 7.9K each. Each needed 2,048 more cells; P had 293 free. Nothing else was running in P, and the
+    waiting continuations block new P admissions, so P was deadlocked. The deadlock breaker carried over from Exp 4
+    fires only when *nothing is running in the whole server* (`if not self.running and self.cont_q`). F always had a
+    request running, so the breaker never fired for P. P stayed frozen from 4,851 s to 14,665 s (9,815 s = 67% of the
+    run) with only 2 P admissions after the freeze started (633 before). For those 164 min, all 500 tasks were served
+    by F alone (strict FCFS, about 1.6 running), which explains 2.0 tasks/min, the 2x latencies, high KV % (memory
+    held by the frozen caches) and low TPOT (few requests decoding). F was also idle 29.6% of the time, almost all of
+    it while an F continuation waited and P was running, the same flaw in the other direction. The 35 deadlock
+    discards happened only in moments when both partitions were idle at once.
+  - **Conclusion (revised):** E10b's result does not measure the split-pool idea. It measures a scheduler whose deadlock
+    breaker is not partition-aware. Fix: run the breaker per partition (if a partition has nothing running and none of
+    its waiting continuations fits, discard its continuation holding the fewest cells). A rerun (E10c) with that fix is
+    needed before drawing conclusions about α splits. Smaller partitions do make this deadlock much more likely: two
+    ~8K continuations fill a 16K half, whereas the full 32K pool would have let them continue.
+  - Reproduce: `setsid nohup experiments/mem_admission/run_e10b_full500.sh > results/mem_admission/run_full500_e10b.log
+    2>&1 < /dev/null & disown`.
+- **Reproduce:** `setsid nohup experiments/mem_admission/run_e10_full500.sh > results/mem_admission/run_full500_e10.log
+  2>&1 < /dev/null & disown`.
+- **E10c (user, 2026-11-26): "Proposed fix (E10c) and do a smoke test first now."** Same as E10b plus a per-partition
+  deadlock breaker. Scheduler flag `--split-breaker {global,partition}` (default `global` keeps E10/E10b reproducible):
+  with `partition`, after a dispatch pass that admits nothing, any partition with no running request and at least one
+  waiting continuation discards its continuation holding the fewest cells (slot erased; it re-enters as a new request
+  and recomputes its history); the global breaker still runs afterwards. `events.csv` gains a `partition` column.
+  - Offline stub test (`scratchpad/stub_e10c.py`, replaying the E10b freeze state: two P continuations of 7,917 and
+    7,918 cells, one F request running, one new request waiting): `global` leaves P frozen (293 free, nothing
+    started); `partition` discards the 7,917-cell continuation, the other P continuation resumes, P free 6,162.
+  - **Incident: llama.cpp binary deleted (2026-11-26, between 06:55 and 16:19 UTC).** While freeing disk, the user removed
+    `~/t4runtime`, which held the instrumented build (`~/bin/llama-server-kv` is a symlink into it) and the prebuilt
+    runtime used by `~/bin/llama-server`. The first smoke launch failed (`FileNotFoundError` for the binary). The
+    read-only git pack survived, containing exactly commit `1242be66f65d5d8a3d996ba56d6de106ced98cf6` (b11780). Rebuilt
+    following `runtime/README.md`: checkout of that commit, `git apply runtime/llama-b11780-kv-occupancy.patch`, then
+    `cmake -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF
+    -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF` and
+    `cmake --build build --target llama-server -j 4` (CUDA 12.8 at `/usr/local/cuda`). The web UI is left out (the
+    first attempt failed downloading UI assets; the experiments do not use the UI). Same source and patch as before,
+    but a fresh compile: per `runtime/README.md`, a rebuild can shift performance slightly, so E10c is compared with
+    caution against runs on the old binary (a FIFO N4 or E7b check on the new binary would settle it). The prebuilt
+    (uninstrumented) runtime behind `~/bin/llama-server` is not restored.
+  - Smoke run: `experiments/mem_admission/run_e10c_smoke.sh` (50 tasks), run
+    `results/mem_admission/smoke_e10c_cap2048_gbm_split_a050_fcfs_mem_pbreak/`, log
+    `results/mem_admission/run_smoke_e10c.log`. Run on the rebuilt binary (`--version`: commit 1242be6, build 0; T4
+    on GPU, decode ~22 ms/token, in line with earlier runs).
+  - **Smoke result (2026-11-26, 50 tasks):** 48/50 completed, 2.88 tasks/min, task latency p50 198.4 s, p95 697.4 s,
+    peak running 8, 36 continuations, max request wait 294 s. Reference smoke runs on the old binary: FIFO N4 46/50,
+    3.3 tasks/min, p50 224.8 s, p95 532.3 s; Exp 4 fixed cap 2,048 50/50, 3.2, 256.8 / 694.6 s; E6 50/50, 3.1,
+    181.0 / 746.5 s.
+    - The fix works: the per-partition breaker fired 4 times (P 3, F 1; 3.1K–6.1K cells), the global breaker never.
+      Time-weighted, P had nothing running 0% of the time (E10b full run: 67%), F 7.3%, and never while requests were
+      waiting. Mean running 2.4 in P + 1.9 in F = 4.3; mean reserved P 13,956 / 16,128, F 11,937 / 16,128.
+      Admissions: 88 by P, 64 by F.
+    - 2 tasks failed as oversized (mbpp-55 step 2, 16,764 cells; mbpp-454 step 10, 16,842 cells; both exceed the
+      16,128-cell partition). These would complete under E7b on the full pool: a direct cost of the split.
+    - Throughput (2.88 tasks/min) is below FIFO N4 and Exp 4 on 50 tasks, and p95 is not better than Exp 4's.
+      50 tasks are too few to judge the tail; a 500-task run is the real test (needs user approval; disk 1.6 GB free).
+  - **500-task run (user: "YES", 2026-11-26):** launched detached 17:10 UTC by
+    `experiments/mem_admission/run_e10c_full500.sh` (log `results/mem_admission/run_full500_e10c.log`), run
+    `results/mem_admission/full500_e10c_cap2048_gbm_split_a050_fcfs_mem_pbreak/`, then `compare_full500.py` (E10c
+    added as a column). Expected ~2.5 h. Finished (run 135.8 min); results below.
+  - Progress checks (`server.log`, same request count in each run): at 667 requests E7b 44.7 min, E10c 50.5 min,
+    E10b 76.7 min; at 1,170 requests E7b 97.5, E10c 100.2, E10b 180.8 min. E10c passed E10b's freeze point
+    (81 min) with no freeze.
+  - **Final result (500 tasks):**
+
+    | metric | FIFO N4 | E7b | E8 T=600 | E10b | E10c |
+    |---|---:|---:|---:|---:|---:|
+    | completed | 480/500 | 500/500 | 500/500 | 496/500 | 496/500 |
+    | tasks/min | 4.21 | 3.70 | 3.78 | 2.02 | 3.65 |
+    | run length (min) | 113.9 | 135.0 | 132.2 | 245.4 | 135.8 |
+    | latency p50 (s) | 2,874 | **1,523** | 3,289 | 5,243 | 2,242 |
+    | latency p90 (s) | **4,479** | 5,317 | 5,100 | 11,360 | 5,328 |
+    | latency p95 (s) | **4,768** | 6,136 | 5,600 | 12,125 | 5,814 |
+    | latency p99 (s) | **5,553** | 7,134 | 6,799 | 13,621 | 7,190 |
+    | max request wait (s) | – | 7,402 | 2,634 | 9,853 | 3,930 |
+    | p50 1-step / 2-step / 3+-step (s) | 1,278 / 3,544 / 4,553 | 2,702 / 295 / 2,325 | 1,390 / 3,949 / 5,085 | – | 2,251 / 1,395 / 4,454 |
+    | TPOT p50 (ms) | 16.6 | 27.2 | 25.6 | 22.9 | 24.8 |
+    | mean running | 4.0 | 5.6 | 5.4 | 2.6 | 5.1 |
+    | mean KV % | 48.3 | 69.8 | 67.9 | 79.6 | 65.7 |
+    | prompt tokens computed | 1.42 M | 3.04 M | 3.00 M | 3.08 M | 3.06 M |
+    | deadlock discards | – | 9 | 4 | 35 | 34 (P 10, F 24) |
+
+    Admissions 882 by P, 516 by F. 4 tasks failed as oversized, the same 4 as E10b (mbpp-465, -307, -454, -178;
+    16,575–17,543 cells > 16,128). Time-weighted: P never idle; F idle 0.5% and never while requests waited; mean
+    running 2.8 (P) + 2.3 (F); mean reserved P 14,691, F 13,838 of 16,128.
+  - **Reading:** the fix removed the freeze (throughput back to E7b level, 3.65 vs 3.70 tasks/min). E10c is a point
+    between E7b and E8 on the p50-vs-tail trade-off, not an improvement over either: vs E7b, p50 +47% (2,242 vs
+    1,523), p95 −5% (5,814 vs 6,136), p99 +1%, max wait −47%; vs E8 T=600, p50 −32% but p95 +4% and p99 +6%; vs FIFO
+    N4, p50 −22% but p95 +22% and p99 +29%, and 4 tasks lost to the split (FIFO N4 lost 20 to KV overflow).
+    The user's hypothesis (better p95/p99 for some p50 loss vs E7b) holds only weakly at p95 and not at p99. The tail
+    is set by throughput (prompt tokens 3.06 M vs FIFO N4's 1.42 M, from discarding caches at tool calls); ordering
+    and partitioning only move waits between tasks. Caveat: E10c ran on the rebuilt binary (same source and patch).
+  - **Correction (2026-11-26, after the user pointed out that FIFO N4 also re-reads history after every tool call).**
+    The claim above that the tail gap comes from "discarding caches at tool calls" was wrong. Measured from
+    `requests.csv` (FIFO N4 `results/t4_full500_v1_part_a/t4_full500_v1_c2_n4_poisson5s_ctx32k_seed2`, E7b
+    `full500_e7b_cap2048_online_gbm`), on the 480 tasks both completed:
+    - FIFO N4 does not keep a task's history either. Its steps after a tool call reuse 29% of their prompt whether or
+      not they land on the same slot as the previous step (24% do); the reused part is about 1,040 tokens per request
+      (mean 1,034, median 1,048), the same at step 0 (91% of a step-0 prompt). That is the prompt prefix shared by all
+      tasks, left in FIFO's 4 slots because it never erases them.
+    - E7b erases slots at tool calls and at completion, so every new request (step 0 and after-tool) recomputes the
+      shared prefix: 0% reuse on 952 new requests, about 1.0 M extra prompt tokens. Continuation chunks reuse 95%.
+    - The rest of the 1.42 M vs 3.04 M gap is the 20 tasks FIFO N4 failed: E7b ran them to the end (about 1.0 M prompt
+      tokens, 196 K generated vs 119 K generated by FIFO before failing).
+    - Prefill is a small share of time anyway: summed per-request prefill time 10.1 min (FIFO N4) vs 32.1 min (E7b),
+      against summed decode time 432 vs 720 min.
+    - The real gap is decode efficiency. Aggregate generation rate: FIFO N4 1.51 M tokens in 113.9 min = 222 tok/s;
+      E7b 1.59 M in 135.0 min = 196 tok/s. E7b runs 5.6 requests at once on average with 70% KV occupied, TPOT 27.2
+      ms; FIFO N4 runs 4.0 with 48% KV, TPOT 16.6 ms. Per Study C each 1K occupied cells adds ~0.45 ms per decode step,
+      so admitting more, longer contexts costs more per token than the extra parallelism gains on the T4.
+    - Consequences: keeping task caches through tool calls is not the lever (FIFO N4 does not do it). Two candidate
+      levers: (1) bound running requests / occupied KV (throughput-optimal point, not "as many as fit"); (2) stop
+      recomputing the shared ~1,040-token prefix (do not erase whole slots, or keep the prefix cached), worth about
+      1 M prompt tokens, ~20 min of summed prefill time.
+    - Mechanism (user asked: "in FIFO N4 we move another request into the slot so the cache gets erased, right?"):
+      no. With `cache_prompt` on, llama.cpp compares the new prompt with the tokens in the slot, keeps the longest
+      common prefix and overwrites only the rest. All tasks start with the same ~1,048 tokens, so the prefix left by
+      whichever task last used the slot is reused. Evidence (FIFO N4 `requests.csv`): the first request on empty slot 0
+      (nl2bash-166 step 0) computed 1,096 tokens, reused 0; the next, unrelated task on slot 0 (nl2bash-178 step 0)
+      reused 1,048 and computed 34; 98.6% of the 500 brand-new step-0 requests reused >= 1,000 tokens (median 1,048).
+      The memory-aware schedulers call `/slots/{id}?action=erase`, which wipes the whole slot including that prefix,
+      hence 0% reuse on new requests. Possible fix (not designed or tested): truncate a slot back to the shared prefix
+      instead of erasing it; costs ~1K cells per idle slot, so only workable with fewer than 32 slots.
+  - Reproduce: `setsid nohup experiments/mem_admission/run_e10c_full500.sh > results/mem_admission/run_full500_e10c.log
+    2>&1 < /dev/null & disown`.
+
+## 31. Experiment 11: slot reuse instead of erasing (2026-11-26)
+
+**Why.** Discussion with the user (lab log §30 correction): FIFO N4 never erases slots, so with `cache_prompt` on,
+llama.cpp keeps the longest common prefix between a slot's cached tokens and the next prompt. 98.6% of FIFO N4's
+step-0 requests reused ~1,048 tokens (the prompt start shared by all tasks). The memory-aware schedulers (Exp 4–10)
+call `/slots/{id}?action=erase` after every step, so every new request recomputes that prefix (0% reuse), and a task
+returning from a tool call can never find its own history. The user asked why the scheduler erases at all and why it
+pins slots instead of letting llama.cpp choose. Findings from the b11780 source (`tools/server/server-context.cpp`):
+- slot choice without `id_slot`: idle slot with the highest LCP / prompt length above `--slot-prompt-similarity`
+  (0.1), else an empty or least recently used slot;
+- with unified KV, when a decode finds no space, `try_clear_idle_slots()` purges the first idle slot with tokens (by
+  slot number, a TODO in the code says "smarter decision ... LRU") and retries;
+- both treat a waiting continuation's slot as idle, so letting llama.cpp choose or purge could destroy a waiting
+  continuation's cache. Hence the approved design keeps scheduler-chosen slots but never erases per step.
+
+**Design (approved by the user 2026-11-26: "yes run 50 task smoke test and please check the reuse % in slots. plot
+insights as well").** Flag `--slot-reuse` (scheduler docstring "Experiment 11"):
+1. Order and admission exactly as E7b (`--order online_gbm`, cap 2,048, free = pool − margin − running reservations −
+   waiting continuations). Leftovers do not count against admission.
+2. A finished step's cache stays in its slot as a leftover (scheduler records its tokens and last-use time).
+3. Slot choice for a new request: the idle slot (never running, never a waiting continuation) whose leftover shares
+   the longest prefix with the prompt; ties: leftovers of finished tasks first, then least recently used; no shared
+   prefix: empty slot, then least recently used leftover.
+4. Physical guard before each start: if running reservations + continuations + leftovers (except the chosen slot)
+   exceed pool − margin, erase leftovers least recently used first. So llama.cpp never runs out of KV and never purges.
+5. Deadlock breaker: the discarded continuation becomes a leftover (not erased). Errors: slot erased.
+Offline stub test (`scratchpad/stub_e11.py`): a returning task picked its own slot (5,048 reusable), a new task got a
+shared-prefix slot (1,048), the guard erased the two oldest leftovers and not the continuation's slot.
+
+**Runs.** `experiments/mem_admission/run_e11_smoke.sh` (launched detached 21:19 UTC; log
+`results/mem_admission/run_smoke_e11.log`) runs sequentially, each with its own server:
+`smoke_e11_cap2048_gbm_slotreuse` (E11) and `smoke_e7b_cap2048_gbm_rebuilt` (control: plain E7b, erase per step, same
+rebuilt binary; there was no 50-task E7b run before). Analysis: `python -m experiments.mem_admission.analyze_e11`
+→ `results/mem_admission/e11_smoke_analysis/` (`reuse_tables.md`, fig1–fig6).
+
+**Results (50 tasks, same binary, same arrivals).**
+
+| metric | E11 slot reuse | E7b control (erase) |
+|---|---:|---:|
+| completed | 50/50 | 50/50 |
+| prompt tokens (computed + reused) | 609,493 | 609,437 |
+| computed | **258,142** | 391,468 |
+| reused % | **57.6** | 35.8 |
+| task latency p50 / p95 / p99 (s) | **219.2 / 713.3 / 909.1** | 227.0 / 824.7 / 962.0 |
+| tasks/min | **3.12** | 2.94 |
+| TPOT p50 (ms) | **24.6** | 26.5 |
+| mean KV % | 70.2 | 66.5 |
+| llama.cpp purges / leftover erases / deadlock discards | 0 / 16 / 0 | 0 / 0 / 0 |
+
+Reuse by request type: step 0 66.1% (control 0%), after a tool call 29.8% (0%), continuations 96.8% (98.1%).
+By slot choice (E11): own previous slot 4 requests, 99.4% reused (median 11,856 tokens); another task's leftover 91,
+30.4% (median 1,048 = the shared prefix); empty 18, 0%; continuation 41, 96.8%. Predicted reuse matched llama.cpp's
+`cache_n` (median difference 0; no request reused less than predicted by > 16 tokens), and llama.cpp never purged, so
+no waiting continuation lost its cache. A few continuations recompute ~1,100–1,500 tokens in both runs (max 1,515
+E11, 1,573 control): not caused by E11.
+
+**Finding: slot-choice flaw.** Only 9 of the 32 slots were ever used. Rule 3 prefers any leftover with the shared
+prefix over an empty slot, so new requests kept overwriting the same 9 slots. Of 63 steps returning from a tool call,
+4 reused their own slot, 50 found it taken by another task, 9 found it erased by the guard (fig6; first reported as 54 / 5: the fig6 classifier counted a slot reused after a guard erase as "taken by another task"; fixed 2026-11-26, the first later user of the slot must have picked it while the leftover was still there). Of the 91 "other"
+choices, 50 overwrote the leftover of a task still alive (in a tool call or queued), every time while untouched empty
+slots existed; 41 overwrote a finished task's leftover. Trading a live task's history (thousands of tokens) for a
+1,048-token prefix is the wrong trade.
+
+**Reading.** Prefix reuse works and is safe: prefill computed −34%, and in this smoke p95 −14%, p99 −6%, p50 −3%,
+throughput +6%, TPOT −7% (TPOT also partly from a different queue history; 50 tasks are noisy). Whole-history reuse
+barely happened because of the flaw above. Proposed fix (E11b, needs approval): slot order own leftover > finished
+task's leftover > empty slot > least recently used live leftover; the guard still frees memory LRU.
+
+### E11b: own-first slot order (approved 2026-11-26)
+
+**Change (only this).** `--slot-order own_first` (`choose_slot_own_first` in `scheduler.py`). The slot for a new request is:
+1. the task's own leftover (whole history reused);
+2. else a finished task's leftover with a shared prefix (longest prefix, ties most recent): the prefix is reused at no cost to a live task;
+3. else an empty slot;
+4. else a finished task's leftover without a shared prefix;
+5. else the least recently used leftover of a live task.
+
+Admission, ordering (online GBM), the memory guard (erase LRU leftovers when the pool would overflow) and the deadlock breaker are the same as in E11.
+Expected: all 32 slots used, many more returning steps find their own slot, more prefill saved. Risk: with more resident leftovers the guard erases more often, and its LRU choice can still hit a live task's history.
+
+**Stub test** (scratchpad, fake `Run`): own slot chosen over finished/empty; finished-with-prefix over empty; empty
+over a live leftover; LRU live leftover when nothing else is free; the E11 rule (`--slot-order lcp`) is unchanged.
+
+**Run.** `run_e11b_smoke.sh` → `results/mem_admission/smoke_e11b_cap2048_gbm_slotreuse_ownfirst/`, same 50 tasks, arrivals, binary
+and flags as the E11 smoke plus `--slot-order own_first`. Control: the existing `smoke_e7b_cap2048_gbm_rebuilt`.
+Analysis: `analyze_e11.py <run> smoke_e7b_cap2048_gbm_rebuilt e11b_smoke_analysis E11b` (the script now takes a label
+and knows the `finished` slot kind). Launched detached 2026-11-26.
+
+**Result (50/50, 0 deadlock discards, 0 llama.cpp purges):**
+
+| | E11b (own first) | E11 (longest prefix) | E7b control |
+|---|---:|---:|---:|
+| prompt tokens computed | 261,617 | 258,142 | 391,468 |
+| prompt reused % | 57.1 | 57.6 | 35.8 |
+| p50 / p95 / p99 (s) | 232.6 / **678.7** / 928.4 | **219.2** / 713.3 / **909.1** | 227.0 / 824.7 / 962.0 |
+| tasks/min | 3.10 | **3.12** | 2.94 |
+| TPOT p50 (ms) | 25.1 | **24.6** | 26.5 |
+| slots used | 12 | 9 | – |
+| guard erases (cells) | **60 (266,739)** | 16 (73,428) | 0 |
+| returning steps: own slot / taken / erased by guard | **11** / 0 / 52 | 4 / 50 / 9 | – |
+
+By slot choice (E11b): own 11 requests, 99.1% reused (median 7,972 tokens); finished task's leftover 40, 30.4%
+(median 1,049); empty 62, 0%; continuation 41, 97.0%; a live task's leftover never had to be taken. Reuse by type:
+step 0 25.7% (E11 66.1%), after a tool call 35.6% (E11 29.8%), continuation 97.0%.
+
+**Reading.** The slot-order fix did what it was meant to: no task overwrote a live task's history any more, and own-slot reuse rose from 4 to 11.
+But total reuse did not move (57.1% vs 57.6%), for two reasons:
+1. The memory guard now erases the histories. 52 of 63 returning steps found their slot erased by the guard; guard erases went from 16 to 60, and the cells erased from 73K to 267K.
+2. New tasks now go to empty slots (most of them slots the guard had just erased) and lose the 1,048-token shared prefix: step-0 reuse fell from 66% to 26%.
+
+Root cause: under E7b admission the reservations (history + 2,048 cap for each running request, plus waiting continuations) average 28,658 cells (p90 31,873) of the 32,256 usable. That leaves about 3.6K cells, roughly one history, for leftovers. Physically only 23,134 cells are occupied on average: the rest is reserved cap that is never generated (median step output 982; 27% of steps hit the cap).
+So with cap-based reservation there is no room to keep histories. Slot choice is not the bottleneck; the reservation is. Latency: E11b's p95 is best, but its p50 is worst of the three. The differences are within 50-task noise.
+
+**Options proposed after E11b** (to the user, 2026-11-26):
+- **A.** Guard on occupied cells instead of reservations. This targets the root cause, but if running requests grow between checks, llama.cpp may purge a waiting continuation.
+- **B.** Guard erases finished tasks' leftovers first.
+- **C.** Run E11 or E11b on the 500-task set.
+
+I recommended A. The user chose B (small, safe, incremental).
+
+### E11c: memory guard erases finished tasks' leftovers first (approved 2026-11-26)
+
+**Reasoning.**
+- E11b's guard erased leftovers purely least recently used. A live task's history (left when it went into a tool call) is often older than a finished task's leftover (left when the task completed), so LRU tended to erase exactly the histories E11b's slot order was meant to protect.
+- A finished task's leftover is worth at most the 1,048-token shared prefix to the next request. A live task's history is worth its whole length (median ~8K tokens) when the task returns.
+- So when the guard must free memory, erase finished tasks' leftovers first. The guard frees the same number of cells; only the choice of victims changes.
+
+**Expectation.**
+- Fewer returning steps lose their history (E11b: 52 of 63).
+- Possibly fewer first steps get the shared prefix, because finished leftovers are what carry it.
+
+**Limit.**
+- Reservations still leave ~3.6K cells for leftovers on average, so when several live histories are resident at once some must still go.
+- B changes which leftovers are erased, not how much memory there is.
+
+**Change (only this).**
+- Config `guard_order` / CLI `--guard-order {lru,finished_first}`. Default `lru` keeps E11/E11b exactly.
+- In `make_room` with `finished_first`, the victim is `min(key=(task not finished, last use))`.
+- Erase events are now logged as `leftover_erase` (live task) or `leftover_erase_finished`; `analyze_e11.py` counts both and the split. Runs before E11c logged every erase as `leftover_erase`, so the split is only available from E11c on.
+
+**Stub test** (scratchpad, fake `Run`: one live leftover last used at t=1, one finished leftover at t=2; the pool must lose one):
+- `lru` erased the live task's history (the older one);
+- `finished_first` erased the finished task's leftover, logged as `leftover_erase_finished`.
+
+**Run.** `run_e11c_smoke.sh` → `results/mem_admission/smoke_e11c_cap2048_gbm_slotreuse_ownfirst_guardfin/`. It uses E11b's exact flags plus `--guard-order finished_first`; the 50-task set, arrivals and binary are the same as E11/E11b. The control is the existing `smoke_e7b_cap2048_gbm_rebuilt`. Analysis goes to `e11c_smoke_analysis` (label E11c). Launched detached 2026-11-26.
+
+**Result (50/50, 0 deadlock discards, 0 llama.cpp purges): worse than E11b, no better than the plain-LRU guard.**
+
+| | E11c (finished first) | E11b | E11 | E7b control |
+|---|---:|---:|---:|---:|
+| prompt tokens computed | 331,153 | 261,617 | **258,142** | 391,468 |
+| prompt reused % | 45.7 | 57.1 | **57.6** | 35.8 |
+| p50 / p95 / p99 (s) | 222.7 / 764.0 / 940.2 | 232.6 / **678.7** / 928.4 | **219.2** / 713.3 / **909.1** | 227.0 / 824.7 / 962.0 |
+| tasks/min | 3.01 | 3.10 | **3.12** | 2.94 |
+| returning steps: own slot / erased by guard | 4 / 59 | **11** / 52 | 4 / 9 (50 taken) | – |
+| guard erases (of which finished task's) | 65 (6) | 60 (split not logged) | 16 | 0 |
+
+Reuse by type: step 0 27.5%, after a tool call 13.8% (E11b 35.6%), continuation 97.6%. By slot choice: own 4
+(97.9%), finished task's leftover 42 (28.3%, median 1,048), empty 67 (0%), continuation 41.
+
+**Why finished-first did not help.**
+- Only 6 of the 65 guard erases hit a finished task's leftover. Finished leftovers rarely stay idle: E11b's slot order hands them straight to new requests (rule 2; 42 such picks), so when the guard runs there is almost never a finished leftover to erase. Its victim set is the same live histories as under LRU.
+- The time a task is away decides whether it finds its history. Time away = from the end of its last step to the start of its next new request (tool call + queue wait).
+
+  | | own-slot hits: median time away | misses: median time away |
+  |---|---:|---:|
+  | E11b | 1 s | 87 s |
+  | E11c | 3 s | 54 s |
+
+  A history survives only if the task returns within seconds. With reservations leaving room for about one history (~3.6K cells), the guard cycles through the leftovers within seconds, so any real tool call plus queue wait outlives its history.
+- The E11b → E11c drop in own-slot hits (11 → 4), and so in reuse after a tool call (35.6% → 13.8%), comes from which tasks happen to return within seconds. That is run-to-run variation, not an effect of the guard order. The 11 own hits in E11b carried 90K reused tokens, which is why total reuse swings so much with a handful of hits.
+
+**Conclusion of the E11 slot-policy line.**
+- Neither slot choice (E11b) nor guard order (E11c) can keep tool-call histories, because under cap-based reservation there is no memory to keep them in.
+- What slot reuse reliably delivers is the shared 1,048-token prefix plus continuations. E11 (longest prefix) gets the most of that: it has the best reuse and p50 of the three.
+- Keeping histories needs headroom: option A (guard on occupied cells, not reservations) or fewer running requests. Next step for the user to decide.
+
+**After E11c (discussion with the user, 2026-11-26/27).**
+- *Is E11b better than E11?* Not separable on 50 tasks. E11b wins p95 (679 vs 713 s) and own-slot hits (11 vs 4); E11 wins p50 (219 vs 233 s) and p99 (909 vs 928 s). E11c, a near-copy of E11b's policy (only 6 of 65 guard erases differ), landed 85 s away from E11b at p95, so the 34 s gap between E11 and E11b is inside the noise.
+- *Does E11b beat FIFO N4 on all metrics?* No. On 50 tasks:
+
+  | | FIFO N4 (Phase 1, old binary) | E11b |
+  |---|---:|---:|
+  | completed | 46/50 | **50/50** |
+  | p50 | **225 s** | 233 s |
+  | p95 | **532 s** | 679 s |
+  | tasks/min | **3.34** | 3.10 |
+
+  The remaining gap is mostly decode speed. FIFO N4 runs ≤ 4 requests; memory-aware admission runs as many as fit (E7b averaged 5.6 on 500 tasks). Per-token time rises with occupancy (16.6 vs 27.2 ms), and total generated tok/s even falls (222 vs 196). Slot reuse only cuts prefill, which is ~22 min of the gap against ~288 min of decode.
+- *The user's point:* E11b is already memory-aware (history + 2,048 budget). Answer: that budget limits what fits, not how many run.
+- Proposed E12 (E11b + a cap on running requests, k ≈ 4–5): not yet approved.
+
+### E11b on the 500-task set (user, 2026-11-27)
+
+The user asked to run E11b on the full 500-task set, detached, before deciding on E12.
+- **Script:** `run_e11b_full500.sh` → `results/mem_admission/full500_e11b_cap2048_gbm_slotreuse_ownfirst/`.
+- **Flags:** the E7b 500-task run's exact flags (trace `agenttrace_full_500_seed2.jsonl`, 500 tasks, rate 0.2, cap 2,048, reserve cap, online GBM order) plus `--slot-reuse --slot-order own_first`, with the plain LRU memory guard. E11c's finished-first guard was dropped because it showed no benefit.
+- **After the run:** `compare_full500` (E11b row added) and `analyze_e11` against `full500_e7b_cap2048_online_gbm` → `e11b_full500_analysis`.
+- **Caveat:** the 500-task E7b and FIFO N4 runs used the original binary. The rebuild is the same commit and patch, but there is no E7b control on the rebuilt binary at 500 tasks.
+
+Launched detached 2026-11-27 (`setsid nohup … & disown`); expected ~2.3 h.
+
+**Result (finished 2026-11-27, run length 129.9 min, 500/500, 0 llama.cpp purges, 4 deadlock discards):**
+
+| 500 tasks | E11b | E7b | FIFO N4 |
+|---|---:|---:|---:|
+| completed | **500/500** | **500/500** | 480/500 |
+| p50 (s) | 1,604 | **1,523** | 2,874 |
+| p95 (s) | 5,958 | 6,136 | **4,768** |
+| p99 (s) | 7,003 | 7,134 | **5,553** |
+| tasks/min | 3.85 | 3.70 | **4.2** |
+| prompt tokens computed | 2.50 M | 3.04 M | 1.42 M |
+| prompt reused % | 45.3 | 33.4 | – |
+| TPOT p50 (ms) | 26.4 | 27.2 | **16.6** |
+| mean KV % / mean running | 70.6 / 5.6 | 69.8 / 5.6 | 48.3 / 4.0 |
+
+**E11b vs E7b:**
+- prompt computed −18% (−542K tokens), tasks/min +4%, p95 −2.9%, p99 −1.8%, TPOT −3%;
+- p50 +5% (1,523 → 1,604 s);
+- deadlock discards 9 → 4.
+
+**Reuse by type (E11b):**
+- step 0: 33.4% (control 0%);
+- after a tool call: 12.8% (0%);
+- continuation: 96.4% (95.6%).
+
+**By slot choice:**
+- finished task's leftover: 444 requests, 35.3% reused (median 1,050 = the shared prefix);
+- empty: 610, 0%;
+- own: 18, 92.9%;
+- continuation: 331.
+
+**Returning steps:**
+- 18 of 568 found their own slot;
+- 550 had it erased by the memory guard;
+- 0 were overwritten by another task.
+
+**Guard and prediction:**
+- Guard erases: 608, of which 54 were finished tasks' leftovers. The finished/live split is now logged for the LRU guard too, because the E11c logging change applies to both orders.
+- Predicted reuse matched `cache_n` (median difference 0); 2 of 793 requests got > 16 tokens less than predicted.
+
+**Reading:**
+- The 50-task picture holds at scale. Slot reuse safely recovers the shared prefix (−18% prefill), but almost no tool-call histories survive: 550 of 568 were erased by the guard, because cap-based reservations leave no room for them.
+- Effect on latency is small: about 2–3% better tail and 4% more throughput, with p50 5% worse.
+- Versus FIFO N4, E11b wins completion (500 vs 480) and p50 (−44%), but loses p95 (+25%), p99 (+26%) and throughput (−8%). This matches the prediction made before the run (p95 ≈ 5,000 s if the smoke gain held; it held less).
+- The gap is decode speed: TPOT 26.4 vs 16.6 ms at 5.6 vs 4.0 running.
+- Caveat: E7b and FIFO N4 used the original binary (same commit and patch).
+- Next lever (proposal, not approved): E12 = E11b + a cap on running requests.
+
+### Incremental change log, E11 line (each run differs from the previous in one thing)
+
+| Run | Change from the previous run | Why | Result |
+|---|---|---|---|
+| E7b control (rebuilt binary) | – (erase slot after every step) | baseline on the same binary | reuse 35.8%, p50/p95 227/825 s |
+| E11 | keep finished caches as leftovers; scheduler picks slot by longest shared prefix; LRU memory guard | FIFO N4 reuses the shared prefix via cache_prompt; E7b's erase threw it away | reuse 57.6%, p50/p95 219/713 s; only 9 slots used |
+| E11b | slot order: own > finished w/ prefix > empty > LRU live | E11 overwrote live histories for a 1,048-token prefix (50/63 returning steps lost their slot) | reuse 57.1%, p50/p95 233/679 s; own hits 4→11 but guard erased 52/63 |
+| E11b, 500 tasks | – (E11b on the full set) | user: test at scale before E12 | 500/500, p50/p95/p99 1,604/5,958/7,003 s, 3.85 tasks/min, prefill −18% vs E7b; own-slot hits 18/568; still behind FIFO N4 on p95/p99/throughput |
+| E12, 500 tasks | E11b + at most 4 requests running at once | decode slows with concurrency (TPOT 26.4 vs 16.6 ms) | worse: p50/p95/p99 2,750/7,193/7,786 s, 3.47 tasks/min; prefill −56% and own-slot hits 386/568, but leftovers keep KV at 21K cells so TPOT 20.7 ms vs FIFO N4 16.6 (§32) |
+| E12b, 500 tasks | server -np 4 (E12 had -np 32) | user: bound what goes into the LLM as FIFO N4 does; E12's 28 idle slots held leftovers that slowed decode | cancelled by the user after 448 requests to run E13 (which includes -np 4); partial folder kept as `CANCELLED_full500_e12b_…` (server.log only) |
+| E13 ("beat FIFO N4") | -np 4 + order by deadline = task arrival + K·min(pred, 2,048) | FIFO N4's tail = multi-step tasks re-queued per step; E11b's tail = early mbpp pushed back by noisy predictions; E12's slowdown = idle caches | smokes: lose to FIFO N4 on p50/p95/mean/throughput. **500 tasks (K=0): beats FIFO N4 on completion 496 vs 480, p50 2,825 vs 2,874, p99 5,073 vs 5,553, max 5,201 vs 5,863; loses p95 4,845 vs 4,768 (+1.6%), mean +3.9%, tasks/min 3.94 vs 4.21**; 4 failures from a guard bug (leftover of a reused slot freed late by llama.cpp) |
+| E11c | guard erases finished leftovers first, then LRU live | E11b's LRU guard erased 52/63 returning steps' histories instead | result: worse (reuse 45.7%, own hits 4); only 6/65 erases were finished leftovers; histories survive only if the task is back within seconds |
+
+## 32. Experiment 12: E11b with at most 4 running requests (2026-11-27)
+
+**Why.**
+- E11b on 500 tasks beat FIFO N4 on completion (500 vs 480) and p50 (1,604 vs 2,874 s), but lost p95 (5,958 vs 4,768 s), p99 (7,003 vs 5,553 s) and throughput (3.85 vs 4.2 tasks/min).
+- The gap is decode speed, not recomputation:
+  - summed decode 699 vs 432 min, against summed prefill 26.7 vs 10.1 min;
+  - TPOT 26.4 vs 16.6 ms at 5.6 vs 4.0 running.
+- Memory-aware admission limits what fits, not how many run, and on llama.cpp each extra running request slows every other one.
+
+**Steps considered before this run.** Proposed to the user, before they chose a direct 500-task E12:
+- a decode-speed benchmark;
+- a FIFO N4 re-run on the rebuilt binary;
+- finishing tasks in progress first;
+- trimming leftovers.
+
+The user also asked whether llama.cpp itself can decode faster without scheduler changes. Settings identified, none run yet:
+- 8-bit KV cache (`-ctk/-ctv q8_0`): helps most at high occupancy, so it would narrow the gap;
+- forcing flash attention on;
+- the physical batch size `-ub`.
+
+vLLM was discussed and set aside; the user chose to stay on llama.cpp.
+
+**Change (only this).**
+- Config `max_running` / CLI `--max-running 4`.
+- A waiting continuation or a new request (including starving ones; the starvation guard is off here) is admitted only if it fits in memory as before *and* fewer than 4 requests are running.
+- Continuations count towards the 4 and still go first; new requests are still blocked while a continuation waits.
+- Everything else as E11b: cap 2,048, reserve history + cap, online GBM order, slot reuse with own-first slot order, LRU memory guard, deadlock breaker, same trace / arrivals / rebuilt binary.
+- `analyze_e11.py` now also takes a control label, so E12 is compared with E11b.
+
+**Expected.**
+- TPOT near FIFO N4's 16.6 ms, throughput ≥ FIFO N4.
+- More tool-call histories survive, because the 4 reservations leave ~20K cells for leftovers instead of ~3.6K.
+- Every task still completes (memory-aware).
+- Risk: longer queue waits, so p50 may rise.
+
+**Run.**
+- Script: `run_e12_full500.sh` → `results/mem_admission/full500_e12_cap2048_gbm_slotreuse_ownfirst_run4/`. Then `compare_full500` (E12 row added) and `analyze_e11 … e12_full500_analysis E12 "E11b (no running cap)"`.
+- Launched detached 2026-11-27, with no smoke run first (user's instruction: straight to 500 tasks).
+- Live check over the first 2 minutes: llama.cpp `requests_processing` never exceeded 4, and `requests_deferred` stayed at 0.
+
+**Result (finished 2026-11-27, run length 143.9 min, 500/500, peak running 4, 0 llama.cpp purges, 0 deadlock discards): worse than E11b on every latency metric and on throughput.**
+
+| 500 tasks | E12 (≤ 4 running) | E11b | FIFO N4 |
+|---|---:|---:|---:|
+| completed | **500/500** | **500/500** | 480/500 |
+| p50 (s) | 2,750 | **1,604** | 2,874 |
+| p95 (s) | 7,193 | 5,958 | **4,768** |
+| p99 (s) | 7,786 | 7,003 | **5,553** |
+| mean (s) | 2,896 | **2,153** | 2,598 |
+| tasks/min | 3.47 | 3.85 | **4.2** |
+| generated tok/s | 184 | 204 | **222** |
+| TPOT p50 (ms) | 20.7 | 26.4 | **16.6** |
+| mean running | 3.9 | 5.6 | 4.0 |
+| mean KV cells occupied | 21,350 (65%) | 23,128 (71%) | **15,841 (48%)** |
+| prompt tokens computed | **1.09 M** | 2.50 M | 1.42 M |
+| prompt reused % | **76.1** | 45.3 | – |
+| returning steps with own slot | **386 / 568** | 18 / 568 | – |
+| TTFT p50 (s) | **0.1** | 0.8 | 0.2 |
+| p50, tasks with 3+ steps (s) | **1,859** | 2,266 | 4,553 |
+| p50, 1-step tasks (s) | 3,991 | 2,999 | **1,278** |
+
+**What worked.**
+- Slot reuse finally keeps histories: 386 of 568 returning steps found their own slot (E11b 18), guard erases fell from 608 to 202, and prefill computed fell to 1.09 M tokens (−56% vs E11b, below FIFO N4's 1.42 M).
+- TTFT p50 is 0.1 s, and multi-step tasks finish fastest of any run (3+ steps p50 1,859 s).
+- No deadlock discards, no llama.cpp purges.
+- 59 of 1,199 reuse predictions came in more than 16 tokens short. These are mostly own-slot returns, consistent with the re-tokenization mismatch seen before; no purge occurred.
+
+**Why it is still slower.**
+- With 4 running, the freed memory fills with leftovers: mean KV occupied is 21.4K cells against FIFO N4's 15.8K at the same concurrency.
+- Decode time per token tracks occupied cells, not just running requests. Median TPOT of requests (output > 200 tokens) by KV occupied when sent:
+
+  | KV cells occupied | 0–8K | 8–16K | 16–24K | 24–33K |
+  |---|---:|---:|---:|---:|
+  | FIFO N4 | 12.5 ms | 15.4 | 20.1 | 25.4 |
+  | E12 (3–4 running) | 13.8 ms | 17.5 | 20.6 | 21.9 |
+
+  At ~4 running both engines slow the same way as occupancy rises. E12 spends most of its time at 16–33K cells (1,134 of 1,336 requests), FIFO N4 at 8–16K.
+- This supports the hypothesis that llama.cpp's unified-KV attention reads the whole occupied range (idle leftovers included), not just each request's own cells. Not verified at code level or by a controlled benchmark yet.
+- Net: 184 generated tok/s vs FIFO N4's 222 and E11b's 204.
+- The load is overloaded (12 arrivals/min against ~4 tasks/min of service), so lower throughput means longer queues for everyone. Single-step tasks suffer most (p50 3,991 s): a single-step task's first request queues behind continuations and returning steps, with only 4 places.
+
+**Reading.**
+- Capping concurrency alone does not recover FIFO N4's decode speed, because slot reuse refills the freed memory with idle caches, and on llama.cpp idle cells cost decode time.
+- The trade-off is prefill saved (large reuse) against decode slowed (occupancy).
+- FIFO N4 gets a natural limit: `-np 4` means at most 4 slots of cache, so it can never hold more than 4 requests' worth of idle cache.
+
+**Next options (proposed, not approved):**
+- **E12b:** E12 + a leftover budget (e.g. occupied ≤ ~16K cells) or keep only live tasks' own histories.
+- **Benchmark:** measure TPOT vs idle cells directly at fixed concurrency.
+- **8-bit KV cache** (`-ctk/-ctv q8_0`): halves the cost of every occupied cell.
+
+**Correction (user, 2026-11-27): E12 was not what the user asked for.**
+- The user meant "4 requests at a time" as bounding what goes into the LLM: the server itself at `-np 4`, as in FIFO N4.
+- I implemented a scheduler-side cap (`--max-running 4`) but left the server at `-np 32`. The GPU never ran more than 4 requests, but up to 28 idle slots kept leftover caches, which pushed occupancy to 21.4K cells and slowed decode.
+- Why FIFO N4 stays at ~16K even though it also keeps leftovers:
+  - with 4 slots, at most 4 caches exist;
+  - under overload, a finished request's slot is taken by the next request within about a second, and llama.cpp then keeps only the matching prefix (~1,048 tokens) and drops the rest;
+  - so FIFO N4 holds almost only its 4 running requests' own caches (~4K cells each).
+- E12 stays in the log as a result in its own right: a scheduler-side cap with many slots does not recover decode speed.
+
+### E12b: E12 with the server at -np 4 (user, 2026-11-27)
+
+**Change (only this).**
+- `--slots 4`, a new CLI option for `cfg.slots`, which sets llama.cpp `-np` and the scheduler's slot list. Still `--max-running 4`; everything else as E11b/E12.
+- At most 4 caches exist: each slot holds a running request, a waiting continuation, or one leftover.
+- Slot reuse still applies: own leftover > finished task's leftover > empty > LRU live leftover, among the free slots.
+
+**Expected.**
+- Occupancy and TPOT near FIFO N4 (~16K cells, ~16.6 ms).
+- Fewer own-slot hits than E12 (only ~0–3 leftovers can exist at once).
+- Memory-aware admission still completes every task.
+- Shared-prefix reuse on most first steps.
+
+**Risk.**
+- A waiting continuation occupies one of the 4 slots without running, so fewer than 4 may run while it waits for memory.
+- If all slots hold waiting continuations, the deadlock breaker handles it.
+
+**Run.** `run_e12b_full500.sh` → `results/mem_admission/full500_e12b_cap2048_gbm_slotreuse_ownfirst_np4/`. Then `compare_full500` (E12b row) and the analysis against E12 (`e12b_full500_analysis`). Launched detached 2026-11-27.
+
+## 33. Final algorithm design proposal (user request, 2026-11-27; not yet approved or run)
+
+**Request (user):** "I want to beat FIFO in all the metrics … I want a final algo design."
+
+**Evidence it is built on (500-task runs):**
+- **Overload:** ~12.7 arrivals/min vs ≤ ~4 tasks/min served. Queue wait is 96–98% of task latency, so latency = throughput + queue order.
+- **Throughput target:** FIFO N4 is 480 tasks in 113.9 min (4.2/min) at 222 generated tok/s. We serve 500 tasks (1.59 M generated tokens, +5%), so beating 4.2/min needs the run to end in < 119 min, i.e. ≥ ~223 tok/s.
+- **Decode speed** depends on occupied KV cells, not only running requests: E12 at 4 running but 21K cells got 184 tok/s (TPOT 20.7 ms) vs FIFO N4's 222 at 16K. E11b at 5.6 running got 204. Server-side `-np` bounds the cells (FIFO N4: at most 4 caches); E12b tests this with our scheduler.
+- **Who forms the tail:**
+  - **E11b, slowest 5%:** 24 of 25 are mbpp tasks that arrived early (median minute 9) with ~2 steps. Shortest-predicted-first kept pushing them back; corr(arrival, latency) = −0.08.
+  - **FIFO N4, slowest 5%:** multi-step tasks (median 4.5 steps, 16 of 24 nl2bash). Every tool return re-queues at the back of a ~300-long queue; corr(arrival, latency) = 0.54.
+- **Ordering theory:** first-come-first-served by *task* arrival minimises the maximum wait at a given throughput; shortest-first minimises the mean. FIFO N4 is FIFO per *step*, not per task, which is why multi-step tasks suffer.
+
+**Proposed algorithm (E13): "task-level deadline order on a FIFO-N4-shaped engine, with memory-aware admission".**
+
+1. **Engine shape (throughput).** llama.cpp at `-np R` (R = 4 to start, as FIFO N4; calibrate R ∈ {3, 4, 5, 6}); unified 32K KV; `cache_prompt` on. At most R caches exist, so occupancy stays at the running requests' own contexts. Engine flags otherwise identical to FIFO N4.
+2. **Admission (completion).** Memory-aware, unchanged:
+   - a request is admitted only if history + 2,048 cap fits;
+   - continuations go first;
+   - deadlock breaker.
+
+   This keeps every task completing (FIFO N4 lost 20 to KV exhaustion).
+3. **Order (p50 and tail).** Every ready step gets a deadline:
+
+   `D = task_arrival + k × predicted_step_tokens`
+
+   - Earliest D first.
+   - `predicted_step_tokens` comes from the online GBM; the true length is never used.
+   - A returning step keeps its task's arrival time, so started tasks finish first (fixes FIFO N4's multi-step tail) and often find their history still in their slot.
+   - k = 0 is task-level FIFO (best tail); larger k lets short steps overtake (better p50).
+   - Overtaking is bounded by k × (prediction gap), so no early task is left to the end (fixes E11b's mbpp tail).
+   - Proposed k ∈ {0, 0.25, 0.5} s per predicted token.
+4. **Slots (prefill).** E11b's own-first slot choice among the R slots: a returning step takes its own leftover if it is still there, else a leftover with the shared prefix, else an empty slot. No extra idle slots, so no decode penalty.
+
+**Expected per metric vs FIFO N4.**
+
+| metric | expected | why |
+|---|---|---|
+| completion | win | memory-aware admission: 500 vs 480 |
+| throughput | tie or narrow win | same engine shape, less prefill (prefix + histories of quickly returning tasks); FIFO N4 also wastes compute on its 20 failing tasks. This is the risk: we serve 5% more tokens |
+| p95 / p99 | win | started tasks finish first and overtaking is bounded |
+| p50 | win if k > 0 | short steps overtake within the bound |
+
+**Validation plan:**
+1. E12b result: our admission at `-np 4`, throughput check.
+2. R calibration and FIFO N4 smoke on the rebuilt binary.
+3. E13 smokes for k ∈ {0, 0.25, 0.5}.
+4. Best k on 500 tasks.
+5. If throughput is short, add 8-bit KV (`-ctk/-ctv q8_0`) to *both* E13 and FIFO N4 as an engine-level change.
+
+### E13 discussion, approval and launch (2026-11-27)
+
+**User questions before approval.**
+- *How is "predicted output tokens of this step" obtained?* From E7b's online gradient-boosted model.
+  - When the step becomes ready, it is scored on 9 features known at that moment: class, step bucket, previous and mean previous generated length, tool error flag, tool result length, history tokens, task characters, number of asserts.
+  - It is trained only on steps already completed in this run: first fit after 30, refit every 20, waiting steps re-scored after each refit.
+  - Before the first fit there is no prediction, so the deadline is the task arrival (task-level FIFO).
+- *Is pred always positively correlated with the true length?* Only on average. Kendall τ-b on E11b's 1,032 predicted steps (500 tasks):
+
+  | subset | τ-b |
+  |---|---:|
+  | all | +0.32 |
+  | mbpp / nl2bash | +0.29 / +0.16 |
+  | **mbpp first step** | **+0.03 (noise)** |
+  | nl2bash first step | +0.24 |
+  | later steps | +0.10 to +0.17 |
+  | first → last quarter of the run | +0.22 → +0.31 |
+
+  - Most of the signal is between groups (class/step), not within one.
+  - The E11b tail is exactly the mbpp first steps: early mbpp tasks pushed back on noise.
+- *What about way-off predictions?*
+  - Errors: 64% of steps within 2×, 19% over-predicted > 2×, 17% under-predicted > 2×. Error percentiles (pred − true): p5 −2,774, p50 +25, p95 +1,316 tokens.
+  - The uncapped deadline shift |k·(pred − true)| reached p95 694 s / max 3,169 s at k = 0.25.
+  - Fix adopted: cap the prediction at one chunk, min(pred, 2,048). A step can then move at most k·2,048 (512 s at k = 0.25), however wrong the prediction. Beyond 2,048 tokens a step runs as continuations, which go first anyway.
+- *Is over-prediction computed in real time?* No. Error is only known after a step completes; the cap bounds its effect without knowing it. The true length is used only after the step completes, as a training label.
+
+**Approval.** The user cancelled the running E12b and asked to run E13, labelled the "beat FIFO N4" algorithm.
+
+**Implementation** (`scheduler.py`, backup `scheduler_before_e13.py` in scratchpad).
+- Config `deadline_k` / CLI `--deadline-k K`.
+- `deadline(j) = recs[j].arrival + K * min(pred or 0, cap)`. The task's first-arrival time is used for every step of the task. The prediction counts only once the online model is ready.
+- `new_key` sorts by `(deadline, ready_at)` when K is set.
+- E13 flags: `--slots 4 --max-running 4 --slot-reuse --slot-order own_first --order online_gbm --cap 2048 --reserve cap`.
+- Unchanged from E11b: memory admission still backfills, i.e. a later request may start if an earlier one does not fit in memory. With 4 slots in 32K cells that should be rare.
+- Stub test (fake `Run`, K = 0.25): the worked example gave deadlines B 400, C 657.5, A 1,050, and a 9,000-token prediction was capped to 100 + 512 = 612. K = 0 and "no model yet" both give pure task-arrival order.
+
+**Pipeline** `run_e13.sh` (detached 2026-11-27, log `results/mem_admission/run_e13.log`):
+1. FIFO N4 50-task smoke on the rebuilt binary (Phase 1 config) → `smoke_fifo_n4_rebuilt`.
+2. E13 smokes K = 0, 0.25, 0.5 → `smoke_e13_beatfifo_k{K}`.
+3. `compare_e13.py` → `e13_smoke_compare.md` (new script; first run is the reference; counts the metrics beaten out of 6: completed, p50, p95, p99, mean, tasks/min).
+4. Automatic choice of K: most metrics beaten against the FIFO N4 smoke, ties to the lowest p95.
+5. E13 with that K on 500 tasks → `full500_e13_beatfifo_k{K}`, compared with FIFO N4, E11b and E12 → `e13_full500_compare.md`.
+
+**Smoke results (50 tasks, all on the rebuilt binary; finished 2026-11-27 ~08:40 UTC; chosen K = 0).**
+
+Bug found and fixed: `compare_e13.py` split each `LABEL=PATH` argument at the first "=", so labels "E13 K=0" broke and the E13 columns were silently dropped from `e13_smoke_compare.md`. It now splits at the last "=". The K selection did not use labels, so it was unaffected. Table regenerated:
+
+| 50 tasks | FIFO N4 (rebuilt) | E11b | E13 K=0 | E13 K=0.25 | E13 K=0.5 |
+|---|---:|---:|---:|---:|---:|
+| completed | 46/50 | 50/50 | 50/50 | 50/50 | 50/50 |
+| p50 (s) | 240.6 | **232.6** | 320.1 | 349.3 | 277.8 |
+| p95 (s) | **554.8** | 678.7 | 650.7 | 669.7 | 745.7 |
+| p99 (s) | 757.0 | 928.4 | **734.1** | 763.6 | 787.2 |
+| mean (s) | **276.8** | 286.4 | 359.1 | 361.9 | 359.5 |
+| max (s) | 834.2 | 945.4 | **784.8** | 804.7 | 792.7 |
+| tasks/min | 3.09 | **3.10** | 3.04 | 2.98 | 3.05 |
+| generated tok/s | **188.7** | 185.3 | 181.9 | 178.3 | 182.7 |
+| prompt computed | **163K** | 262K | 260K | 258K | 271K |
+| mean KV cells / running | 17.3K / 3.59 | 23.1K / 4.72 | 18.4K / 3.62 | 19.0K / 3.57 | 18.8K / 3.81 |
+| metrics beaten (of 6) | – | 3 | 2 | 1 | 1 |
+
+The rebuilt-binary FIFO N4 smoke (p50 240.6, p95 554.8, 3.09 tasks/min) is close to Phase 1's (225, 532, 3.34).
+
+**Reading: E13 does not beat FIFO N4 on the smoke. It wins completion and p99/max, and loses p50, p95, mean and throughput.**
+
+Median latency by task length:
+
+| | 1 step | 2 steps | 3+ steps |
+|---|---:|---:|---:|
+| FIFO N4 | **129 s** | 311 | 525 |
+| E13 K=0 | 333 s | 255 | 549 |
+| E13 K=0.5 | 438 s | **193** | **483** |
+
+FIFO N4's 4 failed tasks are all multi-step (6, 4, 3, 3 steps), so they are excluded from its latencies.
+
+**Why: my ordering argument was wrong for p50 and the mean.**
+- Task-level FIFO serves tasks first-come-first-served. That minimises the maximum wait, and E13 does win p99/max, but it is bad for the mean and median when task sizes vary a lot.
+- FIFO N4's per-step re-queueing behaves like round-robin across tasks (close to processor sharing): a 1-step task never waits behind the remaining steps of an earlier long task. Processor sharing is far better for the mean under high size variance.
+- E13 makes newly arrived single-step tasks wait behind every returning step of earlier tasks: 1-step median 129 → 333 s. K > 0 cannot fix this, because the deadline is dominated by the task's arrival time and the prediction for a first step is weak.
+
+**Throughput.**
+- 181.9 vs 188.7 generated tok/s (−3.6%) at the same running (3.62 vs 3.59) and similar KV (18.4K vs 17.3K).
+- Prompt computed is +60% (260K vs 163K): FIFO N4's returning steps reused 138K history tokens against E13's 87K.
+- E13 returning steps found their own slot untouched only 5 of 63 times (FIFO N4: 10 of 58).
+- The TPOT comparison (19.2 vs 16.3 ms) is biased: E13 splits steps into 2,048-token chunks, and later chunks run at longer contexts, so use tok/s.
+
+**Decision on the 500-task run (K = 0, already started ~08:40).**
+- Left running. Under 500-task overload FIFO N4's per-step re-queue means each tool return waits a full ~300-request queue, a regime the smoke cannot show (FIFO N4's 500-task p50 is 2,874 s against 241 s here).
+- Expectation from the smoke: E13 wins completion and p99, and is likely to lose the mean and possibly p50 / tasks/min.
+
+**500-task result (K = 0; finished 2026-11-27, run length 125.9 min): closest to FIFO N4 of any run, but does not beat it on everything.**
+
+| 500 tasks | FIFO N4 | E11b | E12 | **E13 K=0** | E13 vs FIFO N4 |
+|---|---:|---:|---:|---:|---|
+| completed | 480/500 | 500/500 | 500/500 | 496/500 | **win** |
+| p50 (s) | 2,874 | 1,604 | 2,750 | 2,825 | **win** (−1.7%) |
+| p95 (s) | 4,768 | 5,958 | 7,193 | 4,845 | lose (+1.6%) |
+| p99 (s) | 5,553 | 7,003 | 7,786 | 5,073 | **win** (−8.6%) |
+| mean (s) | 2,598 | 2,153 | 2,896 | 2,700 | lose (+3.9%) |
+| max (s) | 5,863 | 7,663 | 8,317 | 5,201 | **win** (−11%) |
+| tasks/min | 4.21 | 3.85 | 3.47 | 3.94 | lose (−6.4%) |
+| generated tok/s | 221.5 | 204.2 | 184.3 | 208.2 | |
+| TPOT p50 (ms) | 16.6 | 26.4 | 20.7 | 17.9 | |
+| prompt computed | 1.42 M | 2.50 M | 1.09 M | 1.82 M | |
+| mean KV cells / running | 15.8K / 3.98 | 23.1K / 5.59 | 21.4K / 3.90 | 16.3K / 3.91 | |
+
+**What changed versus every earlier memory-aware run.**
+- The tail collapsed to FIFO N4's level: p95 4,845 s (E11b 5,958) and p99 5,073 s, which beats FIFO N4.
+- Decode is back near FIFO N4's: KV 16.3K cells, TPOT 17.9 ms, 208 tok/s.
+- p50 is no longer far ahead (E11b had 1,604 s): task-level FIFO gives up shortest-first's median for the tail.
+
+**4 failed tasks: a memory-guard bug, not a capacity limit.**
+- All four failed together at ~819–823 s with llama.cpp "Context size has been exceeded" (every request in flight failed: mbpp-323, -141, -279, -171).
+- Physical KV rose from 27.5K at 818 s to 31.7K at 822 s, then overflowed, while reservations were 29.2K.
+
+Timeline:
+1. At ~819 s, mbpp-465 finished a step and left a ~16K-token leftover in slot 3.
+2. mbpp-171 (new, 3,149 tokens) was given slot 3 (kind "other", LCP 1,052). In the same dispatch, mbpp-323 (7,389 tokens) went to slot 0.
+3. The guard and accounting treat the chosen slot's leftover as freed the moment the request is sent (`start()` pops it; `make_room` skips `j.slot`). llama.cpp frees it (seq_rm beyond the LCP) only when it reaches that slot's prompt.
+4. Slot 0's 7,389-token prompt was processed first, in 2,048-token batches, while slot 3 still held the old ~15K cells. The pool overflowed and llama.cpp failed the whole batch.
+
+The same flaw existed in E11–E12 but rarely mattered: with 32 slots, new requests mostly took empty or finished slots. With 4 slots, taking a live leftover ("other") is common.
+
+Fix (proposed, needs approval): count the chosen slot's leftover beyond the shared prefix (len − LCP) as occupied in the guard, and erase that slot's leftover first if room is needed.
+
+**Throughput gap (−6.4% tasks/min).**
+- E13 computes 1.82 M prompt tokens vs FIFO N4's 1.42 M, about +0.4 M, mostly histories of returning steps whose slot was overwritten, plus the 2 deadlock discards.
+- It also runs 2,048-token chunks with continuation round trips.
+- And it served 16 more tasks than FIFO N4, the long ones FIFO N4 lost.
+
+**Reading.**
+- Task-level FIFO on a 4-slot engine with memory-aware admission beats FIFO N4 on completion, p50, p99 and max.
+- It loses p95 by 77 s (1.6%), the mean by 102 s (3.9%) and throughput by 6.4%.
+- Remaining levers:
+  - fix the guard bug (all tasks complete);
+  - cut recomputation (more own-slot reuse, fewer deadlock discards);
+  - round-robin-like treatment of 1-step tasks for the mean (the smoke showed task-level FCFS hurts them).
+
+### Per-task SLO comparison against solo latency (user request, 2026-11-27)
+
+**Setup.**
+- New script `experiments/mem_admission/slo_compare.py`. Per task: slowdown = completion under load / solo latency.
+  - Solo latency is Study A, retain mode, mean of 3 reps (`results/solo_SLO/smoke50_v1/compare.csv`).
+  - SLO(α) is met if slowdown ≤ α; failed tasks always miss.
+  - Output: `results/mem_admission/slo_smoke_compare.{md,csv}`.
+- Solo latencies exist only for the 50 smoke tasks, so this is the smoke set. All three runs are on the rebuilt binary.
+- Only 24 of the 500-task trace's tasks have a solo latency; the other 476 need solo runs (estimated ~3.5–4 h, retain mode, 1 rep).
+
+**Result (50 tasks):**
+
+| | FIFO N4 (rebuilt) | E11b | E13 K=0 |
+|---|---:|---:|---:|
+| failed (count as misses) | 4 | 0 | 0 |
+| slowdown p50 / p90 / p95 | 14.6 / 46.1 / ∞ | **11.3 / 28.3 / 37.0** | 16.3 / 60.6 / 96.3 |
+| SLO 5× / 10× / 20× / 50× met | 12 / 30 / 60 / 92% | 16 / **40 / 80 / 96%** | **18** / 38 / 58 / 86% |
+| tasks with lower slowdown than FIFO N4 | – | **27 / 50** | 23 / 50 |
+
+**Reading.**
+- Measured against each task's own solo time, E11b beats FIFO N4 at every SLO level from 5× up, and at p50/p90/p95 slowdown.
+- E13 K=0 is worse than FIFO N4 at 20× and 50×. Task-level FCFS hurts short tasks most in relative terms (mbpp 1-step slowdown p50 25.5 vs 12.6), while it helps 3+-step mbpp tasks (6.4 vs 21.2).
+- Caveat: these are 50-task smokes, which the 500-task results do not always follow.
+
+## 34. SLO benchmark on the 500-task set: FIFO N4 vs E11b, 3 runs each (2026-11-27)
+
+**Request (user).** Benchmark SLO-based segregations and extensive comparisons of FIFO N4 and E11b on the 500-task set, with 3 runs each, averaged.
+
+**Choices** (asked and answered by the user):
+- **Same seed for all 3 runs** (seed 2, identical Poisson arrivals). The average removes run-to-run timing noise, and results stay comparable with every earlier run. Rejected: seeds 2/3/4.
+- **Solo base:** 3 reps per task, retain mode, as in the original solo study. Rejected: 1 rep.
+
+**Why solo runs are needed.** Solo latencies existed only for the 50 smoke tasks, and only 24 of them are in the 500-task trace.
+
+**Design.**
+- **Runs** (all on the rebuilt binary):
+  - FIFO N4 ×3 (`full500_fifo_n4_rebuilt_r{1,2,3}`, Phase 1 config);
+  - E11b ×3 (run 1 = the existing `full500_e11b_cap2048_gbm_slotreuse_ownfirst` with identical flags, plus `_r2`, `_r3`).
+- **Order:** interleaved, F1 E2 F2 E3 F3, so drift affects both. Then solo (`results/solo_SLO/full500_v1`, `run_solo.py --reps 3 --modes retain`, resumable).
+- **Expected time:** ~21–24 h, detached, `run_slo_bench_500.sh`, log `results/mem_admission/run_slo_bench_500.log`.
+- **Analysis:** new `experiments/mem_admission/slo_benchmark.py` → `results/mem_admission/slo_bench_500/`.
+  - Slowdown = completion / solo mean; failed tasks have slowdown ∞.
+  - Every metric is computed per run, then reported as mean ± std over the 3 runs.
+  - SLO levels 2×–500×. Under 500-task overload slowdowns are ~100–400×, so segment tables use 20/50/100/200×.
+  - **Per task:** mean completion over runs; met-share = fraction of runs meeting each SLO; head-to-head on mean slowdown.
+  - **Segregations:** class, step count, solo-length tercile, arrival half.
+  - **Figures:**
+    - attainment curve vs α, with a min–max band over runs;
+    - SLO 100× attainment by segment;
+    - per-task scatter;
+    - slowdown CDF of every run.
+- **Script test:** on existing data (FIFO N4 Phase 1 + two memory-aware runs, 24 tasks with solo latency) it ran end to end and figures were checked visually.
+  - Fixed during the test: a join on multi-level columns; "|" in column names breaking the markdown tables; SLO levels too tight for this load.
+
+Launched detached 2026-11-27 17:31 UTC.
+
+### 34.1 Results (finished 2026-11-28 13:25 UTC)
+
+**Execution.** All stages ran without a crash: F1 17:31–19:26, E2 19:26–21:34, F2 21:34–23:29, E3 23:29–01:39, F3 01:39–03:35, solo 03:35–~13:20 (1,500 solo runs, all ok, ~22 s each; faster than the 11 h estimate), analysis 13:25.
+- **Solo base:** p50 15.7 s, max 135.1 s; median rep-to-rep std 0.51% of the mean, so 3 reps are more than enough.
+
+**Per-run results:**
+
+| Run | Completed | p50 (s) | p95 (s) | Tasks/min |
+|---|---:|---:|---:|---:|
+| FIFO N4 r1 / r2 / r3 | 480 / 476 / 476 | 2,879 / 2,801 / 2,861 | 4,761 / 4,695 / 4,798 | 4.2 / 4.2 / 4.1 |
+| E11b r1 / r2 / r3 | 500 / 500 / 500 | 1,604 / 1,722 / 1,388 | 5,958 / 5,739 / 5,894 | 3.85 / 3.90 / 3.85 |
+
+**Headline (mean ± std over 3 runs):**
+
+| Metric | FIFO N4 | E11b |
+|---|---:|---:|
+| completed | 477.3 ± 2.3 | **500 ± 0** |
+| tasks/min | **4.1** | 3.9 |
+| latency p50 (s) | 2,847 ± 41 | **1,571 ± 170** |
+| latency p95 (s) | **4,751 ± 52** | 5,864 ± 113 |
+| latency p99 (s) | **5,654 ± 114** | 6,876 ± 115 |
+| latency mean (s) | 2,590 ± 31 | **2,085 ± 62** |
+| slowdown p50 | 153 | **56** |
+| slowdown p90 | 519 | **384** |
+| slowdown p95 | 1,009 | **607** |
+| slowdown p99 | ∞ (failures) | **1,374** |
+| SLO 10× met | 3.9% | **27.9%** |
+| SLO 20× met | 6.5% | **35.3%** |
+| SLO 50× met | 16.3% | **45.9%** |
+| SLO 100× met | 33.9% | **63.1%** |
+| SLO 200× met | 61.4% | **76.9%** |
+| SLO 500× met | 89.1% | **93.1%** |
+
+- **Per task:** E11b gives a lower mean slowdown on 324 of 500 tasks (176 higher). Median per-task ratio E11b / FIFO is 0.58. 261 tasks meet 100× in every E11b run, against 158 for FIFO N4.
+- **Spread:** FIFO N4 is very stable (p50 ±1.4%). E11b's p50 varies more (1,388–1,722 s); its admission order depends on the online length predictor and on timing. SLO 100× ranges 33.4–34.6% (FIFO N4) vs 62.0–65.4% (E11b), so the gap is far outside run noise.
+
+**Segregations (SLO 100× met; slowdown p50 in brackets):**
+
+| Segment | FIFO N4 | E11b |
+|---|---:|---:|
+| mbpp (350) | 41.0% (126) | 47.5% (106) |
+| nl2bash (150) | 17.6% (219) | **99.6% (6.8)** |
+| 1 step (165) | **51.5% (98)** | 39.0% (161) |
+| 2 steps (230) | 26.1% (196) | **71.3% (24.5)** |
+| 3+ steps (105) | 23.5% (180) | **83.2% (51)** |
+| short solo (167) | 18.4% (333) | **55.3% (43)** |
+| medium solo (166) | 30.1% (166) | **56.2% (61)** |
+| long solo (167) | 53.3% (96) | **77.8% (57)** |
+| first-half arrivals | 54.0% (93) | **61.6% (58)** |
+| second-half arrivals | 13.9% (218) | **64.7% (53)** |
+
+**Reading.**
+- **On per-task SLO, E11b beats FIFO N4 decisively.** It is ahead at every SLO level from 5× up, and wins in every segment except 1-step tasks. The only level where FIFO N4 leads is 2× (1.2% vs 0.8%), which almost nobody meets under this overload.
+- **Why nl2bash and multi-step tasks win:**
+  - The online predictor ranks nl2bash steps short, so they are admitted almost immediately (slowdown 6.8×).
+  - Continuations go first, and the own-slot leftover means a returning task's later steps skip the queue and most of the prefill.
+  - FIFO N4 re-queues every step behind all waiting work, so a multi-step task pays the queue wait once per step.
+- **Why 1-step tasks lose:** these are mostly mbpp first steps, which the predictor ranks long (and, at τ ≈ 0.03, essentially at random). They wait behind continuations and short-predicted work. This is the same effect as E11b's worse p95/p99: E11b moves the long-predicted work to the tail.
+- **Arrival half:** FIFO N4 degrades as the queue builds (SLO 100× falls from 54% to 14% in the second half). E11b stays flat (62% → 65%), because its ordering does not depend on how long the queue has grown.
+- **What still loses:** throughput (3.9 vs 4.1 tasks/min, slower decode from the leftover-occupied KV) and the latency tail (p95 +23%, p99 +22%). The latency mean is 20% better.
+
+**Outputs.**
+- `results/mem_admission/slo_bench_500/`:
+  - `slo_benchmark.md`;
+  - `per_run_metrics.csv`, `per_task.csv`, `segments_per_run.csv`;
+  - `fig1_slo_attainment_curve.png`, `fig2_slo100_by_segment.png`, `fig3_per_task_slowdown_scatter.png`, `fig4_slowdown_cdf.png`.
+- Solo base: `results/solo_SLO/full500_v1/retain/task_metadata.jsonl`. This also closes open item 6.
+
+### 34.2 Full detail: every segment at every SLO level, figures, caveats
+
+Mean over the 3 runs per system. Each cell is FIFO N4 / E11b. Solo-length terciles split at 11.5 s and 22.5 s.
+
+**By class** (FIFO N4 / E11b):
+
+| Segment (n) | SLO 20× met % | SLO 50× met % | SLO 100× met % | SLO 200× met % | slowdown p50 |
+|---|---:|---:|---:|---:|---:|
+| mbpp (350) | 7.6 / 17.7 | 19.9 / 28 | 41 / 47.5 | 68.1 / 67 | 126.3 / 106.1 |
+| nl2bash (150) | 4 / 76.2 | 8 / 87.8 | 17.6 / 99.6 | 45.8 / 100 | 218.8 / 6.8 |
+
+**By steps** (FIFO N4 / E11b):
+
+| Segment (n) | SLO 20× met % | SLO 50× met % | SLO 100× met % | SLO 200× met % | slowdown p50 |
+|---|---:|---:|---:|---:|---:|
+| 1 step (165) | 9.1 / 21.8 | 27.9 / 29.5 | 51.5 / 39 | 78.4 / 55.2 | 98.1 / 161.1 |
+| 2 steps (230) | 6.4 / 48.3 | 12 / 57.4 | 26.1 / 71.3 | 51.2 / 84.8 | 195.9 / 24.5 |
+| 3+ steps (105) | 2.9 / 27.9 | 7.6 / 46.7 | 23.5 / 83.2 | 57.1 / 94 | 180.3 / 51.1 |
+
+**By solo length** (FIFO N4 / E11b):
+
+| Segment (n) | SLO 20× met % | SLO 50× met % | SLO 100× met % | SLO 200× met % | slowdown p50 |
+|---|---:|---:|---:|---:|---:|
+| long (167) | 9.4 / 20.2 | 25.1 / 38.3 | 53.3 / 77.8 | 86.2 / 96.4 | 95.7 / 56.7 |
+| medium (166) | 4.2 / 41.4 | 13.9 / 48.6 | 30.1 / 56.2 | 64.5 / 74.3 | 165.9 / 60.5 |
+| short (167) | 6 / 44.3 | 10 / 50.9 | 18.4 / 55.3 | 33.5 / 60.1 | 332.9 / 43.1 |
+
+**By arrival** (FIFO N4 / E11b):
+
+| Segment (n) | SLO 20× met % | SLO 50× met % | SLO 100× met % | SLO 200× met % | slowdown p50 |
+|---|---:|---:|---:|---:|---:|
+| first half (250) | 13.1 / 36.1 | 31.1 / 44.7 | 54 / 61.6 | 76.7 / 74.4 | 92.5 / 57.9 |
+| second half (250) | 0 / 34.4 | 1.6 / 47.2 | 13.9 / 64.7 | 46.1 / 79.5 | 218 / 53.3 |
+
+Two notes on these tables:
+- **SLO 200×:** E11b loses only two cells: 1-step tasks (78.4 vs 55.2%) and, narrowly, mbpp (68.1 vs 67.0%). Everything else is an E11b win at every level.
+- **1-step tasks:** the gap is widest at loose SLOs. At 20× and 50×, E11b is still slightly ahead (21.8 vs 9.1%, 29.5 vs 27.9%). The tasks it serves quickly are served faster than under FIFO N4, but the rest wait longer.
+
+**Figures** (`results/mem_admission/slo_bench_500/`):
+- **fig1, attainment vs α:**
+  - The curves meet below ~3×.
+  - E11b climbs steeply from 4× to 8×; these are the nl2bash and short-predicted tasks admitted almost at once.
+  - FIFO N4 stays under 10% until ~30×.
+  - From there the gap stays at 15–30 points up to ~300×, then both converge near 95–98%. FIFO N4 is capped at ~95% by its failures.
+  - The min–max bands over runs are thin, narrower than the gap everywhere.
+- **fig2, SLO 100× by segment:** E11b's bar is higher in every group except "1 step".
+- **fig3, per-task scatter** (mean slowdown over runs; tasks that failed in any run are not plotted):
+  - 289 tasks below the diagonal (E11b better), 176 above, 35 failed in some FIFO N4 run.
+  - The 35 failures count as E11b wins in the head-to-head, giving 324.
+  - A dense cluster at E11b 4–10× against FIFO N4 100–500× is the nl2bash group.
+  - Points above the diagonal sit mostly at FIFO N4 10–100× against E11b 100–1,000×: the long-predicted 1-step mbpp tasks.
+- **fig4, slowdown CDF of every run:**
+  - The three runs of each system almost overlap.
+  - E11b is left of FIFO N4 everywhere above ~3×.
+  - FIFO N4's curve flattens at ~95% (failed tasks).
+
+**Caveats for the paper:**
+- **One workload, one seed:** seed 2, Poisson mean gap 5 s, i.e. ~12.7 arrivals/min against ~4 served. The three runs measure scheduler and timing noise, not workload variance.
+- **Overload:** absolute slowdowns are 50–150× because the system is overloaded. The comparison is between schedulers under the same overload, not a claim about meeting tight SLOs.
+- **Run 1 of E11b** is the earlier run (finished 2026-11-27 02:10 UTC), not part of this pipeline. It used the same binary and flags; its p50 (1,604 s) lies between runs 2 and 3 (1,722 and 1,388 s); its p95 (5,958 s) is the highest of the three, 64 s above run 3.
+- **Solo base:** retain mode, 3 reps, the same binary. 1,500/1,500 ok; rep-to-rep std median 0.51%.
+
+**Next directions this suggests (not approved):**
+1. Fix the long-predicted 1-step mbpp tail, for example by ageing or a share of slots for first steps ranked by waiting time. This targets the only losing segment and E11b's p95/p99.
+2. Raise throughput towards FIFO N4's: E11b's decode is slower because leftovers occupy the KV range.
+
 ## Results at a glance
 
 | | Baseline FIFO N4 | Exp 1 | Exp 2 | Exp 3 MLFQ | Exp 4 fixed cap 1,024 | Exp 4 fixed cap 2,048 | Exp 4 fixed cap 4,096 | Exp 4 fixed cap 8,192 | E5a (cap 2,048, guard 60 s) | E5b (cap 2,048, guard 120 s) | E6 (cap 2,048, lookup order) | Exp 4 oracle* |
@@ -901,6 +2034,18 @@ The table above is the 50-task smoke set.
 | Kendall τ-b of the order | – | **0.33** (offline) | 0.26 (online) | 0.32 (online) |
 
 FIFO N16 (500 tasks) completed only 177/500. Details in section 27 and `results/mem_admission/compare_full500.md`.
+
+### 500-task set, 3 runs each, per-task SLO (section 34)
+
+| Mean over 3 runs | FIFO N4 | E11b |
+|---|---:|---:|
+| Completed (of 500) | 477.3 | **500** |
+| Tasks/min | **4.1** | 3.9 |
+| Latency mean / p50 (s) | 2,590 / 2,847 | **2,085 / 1,571** |
+| Latency p95 / p99 (s) | **4,751 / 5,654** | 5,864 / 6,876 |
+| Slowdown p50 / p95 | 153× / 1,009× | **56× / 607×** |
+| SLO 20× / 100× / 200× met | 6.5 / 33.9 / 61.4% | **35.3 / 63.1 / 76.9%** |
+| Tasks with lower mean slowdown | 176 | **324** |
 
 \* Exp 4 oracle = reservation `history + true remaining output` (cap 8,192 run of section 15); not achievable
 without knowing output lengths, kept as an upper bound. The oracle-below-cap runs (caps 1,024–4,096, section 15)
@@ -938,6 +2083,9 @@ are in [`mem_admission/README.md`](mem_admission/README.md). Bold = best among r
     requests, gradient-boosted trees with history features reached τ 0.32 (offline lookup 0.33) and beat the online
     class × step median (0.26) in every quarter. Its weak first half still cost median latency (1,523 vs 1,277 s).
     Better cold-start ranking, not a better steady-state model, is where the remaining gap is.
+11. **A fixed per-request starvation guard collapses into FIFO under overload, at any threshold tried (Exp 5, Exp 8).**
+    On 500 tasks, T = 120 / 240 / 600 s on top of E7b all gave 77–92% starving requests, p50 ~3,300 s (E7b 1,523 s)
+    and p95 ~5,600–5,750 s (E7b 6,136 s, FIFO 4,768 s). The head-of-line block makes starvation self-reinforcing.
 8. **Caveats:** all of this is one run per configuration on 50 tasks under overload (12 tasks/min offered vs ~3
    served), with caps chosen in-sample. Sub-capacity loads and the 500-task set are needed before claims.
 
@@ -1088,6 +2236,7 @@ they are **not committed** unless force-added (`git add -f`); the ones outside `
 | Workload stats: output- and input-length histograms (113 requests) | `experiments/workload_stats/output_length_hist.py`, `input_length_hist.py`, [`README.md`](workload_stats/README.md) | `experiments/workload_stats/output_length_hist.png` (median 995, mean 1,590, p75 2,095, p90 3,853, max 7,471; first steps median 1,698, later steps 873; 55 / 30 / 10 requests exceed 1,024 / 2,048 / 4,096), `input_length_hist.png` (new input and full prompt) | – |
 | Exp 6: lookup ordering | `experiments/mem_admission/scheduler.py --order lookup`, `length_lookup.json`, `length_lookup_full500.json`, `compare_full500.py` | `results/mem_admission/smoke_e6_cap2048_lookup/`, `full500_e6_cap2048_lookup/` (Exp 4 files), `compare_full500.{csv,md}`, check `results/mem_admission_checks/check_e6/` | `results/mem_admission/run_e6.log`, `run_full500_e6.log` |
 | Exp 7: online-estimator ordering (500 tasks) | `experiments/mem_admission/scheduler.py --order online_median / online_gbm`, `online_estimator.py`, `run_e7_full500.sh`, `compare_full500.py` (run with `/opt/pytorch/bin/python3`) | `results/mem_admission/full500_e7a_cap2048_online_median/`, `full500_e7b_cap2048_online_gbm/` (Exp 4 files plus `online_model.csv`; `requests.csv` has `pred`, `pred_n`), `compare_full500.{csv,md}`; lost attempt `full500_e7a_interrupted_attempt1/` | `results/mem_admission/run_full500_e7.log`, `run_full500_e7_attempt1_interrupted.log` |
+| One-at-a-time serving (simulation, 500 tasks) | `experiments/one_at_a_time/simulate.py` (run with `/opt/pytorch/bin/python3`) | `results/one_at_a_time/summary.csv` | `results/one_at_a_time/run.log` |
 | Online length estimation (offline replay) | `experiments/online_length/simulate.py` (run with `/opt/pytorch/bin/python3`) | `results/online_length/` (`predictions.csv`, `windows.csv`, `summary.json`, `tau_over_time.png`, `learning_curve.{csv,png}`) | `results/online_length/run.log` |
 | LTR-0: published predictor, zero-shot | `experiments/ltr_ranking/opt_zero_shot.py` (run with `/opt/pytorch/bin/python3`, `PYTHONPATH=~/ltr_pylib`); checkpoint in `~/models/ltr/` | `results/ltr_ranking/opt_zero_shot/` (`predictions.csv`, `errors.csv`, `rank_reference.csv`, `by_step.csv`, `meta.json`) | `results/ltr_ranking/opt_zero_shot/run.log` |
 | LTR step 2: replay + predictor with real outputs | `experiments/ltr_ranking/replay_outputs.py`, `opt_with_outputs.py` | `results/ltr_ranking/replay_outputs/` (`outputs.jsonl`: generated token ids per step), `results/ltr_ranking/opt_with_outputs/` (`predictions.csv`, `errors.csv`, `by_step.csv`, `tau_with_vs_without_outputs.csv`, `meta.json`) | `results/ltr_ranking/replay_outputs.log` and `replay_outputs_attempt{2_failed,3_livelock,4_interrupted}.log`, `opt_with_outputs/run.log` |
@@ -1096,6 +2245,7 @@ they are **not committed** unless force-added (`git add -f`); the ones outside `
 | Phase 1 reference (smoke) | `phase1/runner.py` | `results/t4_load_v1_part_b/t4_load_v1_poisson5s_n4_ctx32k_seed2/` | – |
 | Phase 1 reference (500 tasks, R2) | `phase1/runner.py` | `results/t4_full500_v1_part_a/t4_full500_v1_c2_n4_poisson5s_ctx32k_seed2/` | – |
 | Solo-vs-FIFO comparison (section 9) | computed ad hoc from the Study A and baseline CSVs above | – | – |
+| SLO benchmark, 500 tasks (section 34) | `experiments/mem_admission/run_slo_bench_500.sh`, `slo_benchmark.py`; `experiments/solo_SLO/run_solo.py` (run with `/opt/pytorch/bin/python3`) | `results/mem_admission/slo_bench_500/` (`slo_benchmark.md`, `per_run_metrics.csv`, `per_task.csv`, `segments_per_run.csv`, fig1–fig4), runs `results/mem_admission/full500_fifo_n4_rebuilt_r{1,2,3}/`, `full500_e11b_cap2048_gbm_slotreuse_ownfirst{,_r2,_r3}/`, solo `results/solo_SLO/full500_v1/` | `results/mem_admission/run_slo_bench_500.log` |
 
 The Exp 3 walkthrough page is a private claude.ai artifact (https://claude.ai/artifact/D75dSYcfCyFpg7K5kEZ5Ak); its
 HTML is not in the repository.
@@ -1112,5 +2262,5 @@ HTML is not in the repository.
 3. Keep the shared system-prompt prefix when a task finishes.
 4. Task-level priority (tokens served per task, with aging) instead of per-request.
 5. Sub-capacity loads (2.5–3.8 tasks/min) for SLO comparisons; the 500-task workload before any conclusion.
-6. Solo latency for all 500 tasks (retain mode, one rep, ~3.3 h).
+6. ~~Solo latency for all 500 tasks~~ Done (section 34): 3 reps, retain mode, `results/solo_SLO/full500_v1`.
 7. Explain the remaining partial cache reuse on resume.

@@ -398,6 +398,107 @@ The online model nearly matches the offline lookup's ranking with no outside dat
 behaviour (0 failures), but its weaker early ranking leaves median latency between E7a and E6. Full table:
 `results/mem_admission/compare_full500.{csv,md}`; discussion in the lab log, section 27.
 
+## Experiment 8: E7b plus the Exp 5 fixed starvation guard, T = 120 / 240 / 600 s (500 tasks)
+
+E7b unchanged plus `--starve-s T` (starving = new request waiting >= T; starving requests first, oldest first, the
+oldest one that does not fit blocks all other new admissions). Launcher `run_e8_full500.sh` (T = 120 s first run by
+`run_e8a_full500.sh`); T = 360 s was stopped by the user at 655 requests and replaced by 600 s.
+
+| metric | FIFO N4 | E7b | T=120 | T=240 | T=600 |
+|---|---:|---:|---:|---:|---:|
+| completed | 480/500 | 500/500 | 500/500 | 500/500 | 500/500 |
+| tasks/min | 4.21 | 3.70 | 3.77 | 3.73 | 3.78 |
+| latency mean / p50 (s) | 2,598 / 2,874 | 2,173 / 1,523 | 3,007 / 3,458 | 3,028 / 3,331 | 2,870 / 3,289 |
+| latency p95 / p99 / max (s) | 4,768 / 5,553 / 5,863 | 6,136 / 7,134 / 7,850 | 5,758 / 6,738 / 7,449 | 5,654 / 6,883 / 7,619 | 5,600 / 6,799 / 7,371 |
+| request wait p50 / max (s) | – | 52 / 7,402 | 1,436 / 2,689 | 1,435 / 2,716 | 1,380 / 2,634 |
+| admitted as starving | – | 0 | 92% | 87% | 77% |
+| blocked by a starving request (s) | – | 0 | 6,004 | 5,891 | 5,038 |
+
+The guard is self-reinforcing: one starving request blocks all others, whose waits then pass T too, so the queue
+becomes FIFO with head-of-line blocking at every threshold tried. It bounds the longest wait (−64%) and trims p95
+(−9%) but more than doubles p50. Discussion: lab log section 28.
+
+## Experiment 10b: split KV pool, α = 0.5, P = E7b, F = memory-aware FCFS (500 tasks)
+
+Design (lab log §30): the scheduler's accounting splits the 32,256 usable cells into P (16,128, E7b order with
+backfill) and F (16,128, strict ready-time order, reservation history + 2,048, no concurrency limit). A waiting
+continuation blocks new admissions in its own partition only; a request whose reservation exceeds a partition fails
+with its task. Flags: `--order online_gbm --alpha 0.5 --fifo-conc 32`. Run
+`results/mem_admission/full500_e10b_cap2048_gbm_split_a050_fcfs_mem/`, script `run_e10b_full500.sh`.
+(E10, the same with F limited to 2 running, was stopped by the user at 220 requests for low throughput.)
+
+Result: 496/500 (4 oversized mbpp failures), 2.0 tasks/min, run 245 min, task latency p50 5,243 s, p95 12,125 s,
+p99 13,621 s, about 2x worse than E7b and FIFO N4. **Invalid as a test of the split:** at t = 4,851 s two P continuations
+(about 7.9K cells each) filled P and each needed 2,048 more, so P deadlocked. The deadlock breaker only fires when
+nothing runs in the whole server, and F always had work, so P stayed frozen for 9,815 s (67% of the run) and F served
+everything alone. Fix: a per-partition deadlock breaker; rerun as E10c (pending approval).
+
+## Experiment 10c: E10b plus a per-partition deadlock breaker (smoke)
+
+`--split-breaker partition`: if a partition has nothing running and none of its waiting continuations fits, its
+continuation holding the fewest cells is discarded. Script `run_e10c_smoke.sh`, run
+`results/mem_admission/smoke_e10c_cap2048_gbm_split_a050_fcfs_mem_pbreak/` (rebuilt binary, see lab log §30).
+Smoke: 48/50 (2 oversized mbpp failures, >16,128 cells), 2.88 tasks/min, p50 198.4 s, p95 697.4 s. The breaker fired
+4 times (P 3, F 1); P never sat idle (E10b: 67% of the run).
+500 tasks (`run_e10c_full500.sh`, `full500_e10c_cap2048_gbm_split_a050_fcfs_mem_pbreak/`): 496/500 (same 4 oversized
+mbpp failures as E10b), 3.65 tasks/min, run 135.8 min, p50 2,242 s, p95 5,814 s, p99 7,190 s, max wait 3,930 s.
+Versus E7b (1,523 / 6,136 / 7,134 s): p50 worse, p95 5% better, p99 equal. Versus FIFO N4 (2,874 / 4,768 / 5,553 s):
+p50 better, tail worse. A trade-off point between E7b and E8, not a win on all percentiles.
+
+## Experiment 11: E7b with slot reuse instead of erasing (smoke)
+
+`--slot-reuse` (scheduler docstring): finished caches stay in their slot as leftovers; the scheduler picks the idle slot
+with the longest shared prompt prefix (never a running or waiting-continuation slot); leftovers are erased LRU only
+when the physical pool would overflow, so llama.cpp never purges. Script `run_e11_smoke.sh` (E11 then an E7b control on
+the same rebuilt binary), analysis `analyze_e11.py` → `results/mem_admission/e11_smoke_analysis/`.
+50 tasks: both 50/50; prompt reuse 57.6% vs 35.8% (computed 258K vs 391K tokens); p50 219 vs 227 s, p95 713 vs
+825 s, p99 909 vs 962 s; 3.12 vs 2.94 tasks/min; 0 llama.cpp purges. Flaw: the rule prefers a shared-prefix leftover
+over an empty slot, so only 9 of 32 slots were used and 54 of 63 returning steps lost their own slot to another task.
+Details in lab log §31.
+
+## Experiment 11b: own-first slot order (smoke)
+
+`--slot-reuse --slot-order own_first` (`run_e11b_smoke.sh`): the slot is the task's own leftover, else a finished
+task's leftover with the shared prefix, else an empty slot, else the least recently used live leftover. 50/50, prompt
+reused 57.1% (E11 57.6%, control 35.8%), p50/p95/p99 232.6/678.7/928.4 s. Own-slot reuse rose from 4 to 11 returning
+steps and no live history was overwritten, but the memory guard erased 52 of 63 returning steps' histories (60 guard
+erases vs 16): cap-based reservations average 28.7K of the 32.3K usable cells, leaving room for about one history.
+Figures: `results/mem_admission/e11b_smoke_analysis/`. Details in lab log §31.
+
+## Experiment 11c: finished-first memory guard (smoke)
+
+E11b + `--guard-order finished_first` (`run_e11c_smoke.sh`): when the pool would overflow, erase finished tasks'
+leftovers first, then the least recently used live ones. 50/50, prompt reused 45.7%, p50/p95/p99 222.7/764.0/940.2 s,
+own-slot hits 4 of 63, 59 histories erased by the guard. Only 6 of 65 erases hit a finished leftover (new requests take
+those first), so the victims are the same live histories as under LRU; a history survives only if its task is back
+within seconds. The slot-policy line is exhausted: keeping histories needs memory headroom. Figures:
+`results/mem_admission/e11c_smoke_analysis/`. Details in lab log §31.
+
+## Experiment 11b on the 500-task set
+
+`run_e11b_full500.sh`: 500/500, p50/p95/p99 1,604/5,958/7,003 s, 3.85 tasks/min (E7b 1,523/6,136/7,134 s, 3.70;
+FIFO N4 2,874/4,768/5,553 s, 4.2, 480/500). Prompt computed 2.50 M vs 3.04 M (−18%), reuse 45.3% vs 33.4%; 18 of 568
+returning steps found their own slot, 550 were erased by the memory guard. Figures and tables:
+`results/mem_admission/e11b_full500_analysis/`; comparison: `results/mem_admission/compare_full500.md`. Lab log §31.
+
+## Experiment 12: E11b with at most 4 running (500 tasks)
+
+`run_e12_full500.sh` (`--max-running 4`): 500/500, p50/p95/p99 2,750/7,193/7,786 s, 3.47 tasks/min, all worse than
+E11b (1,604/5,958/7,003 s, 3.85). Prefill computed 1.09 M tokens (E11b 2.50 M, FIFO N4 1.42 M), 386 of 568 returning
+steps reused their own slot, TTFT p50 0.1 s. But leftovers fill the freed memory (mean 21.4K cells vs FIFO N4's 15.8K
+at the same 4 running), and decode time per token rises with occupied cells (20.7 vs 16.6 ms): 184 generated tok/s vs
+222. Figures: `results/mem_admission/e12_full500_analysis/`. Lab log §32.
+
+## Experiment 13: the "beat FIFO N4" algorithm
+
+`run_e13.sh`: -np 4, at most 4 running, memory-aware admission, order by task arrival + K·min(predicted step tokens,
+2,048), own-first slot reuse. Smokes K = 0 / 0.25 / 0.5 against a FIFO N4 smoke on the rebuilt binary
+(`e13_smoke_compare.md`); K = 0 chosen. 500 tasks (`e13_full500_compare.md`): 496/500, p50/p95/p99 2,825/4,845/5,073 s,
+mean 2,700 s, 3.94 tasks/min, vs FIFO N4 480/500, 2,874/4,768/5,553 s, 2,598 s, 4.21. Beats FIFO N4 on completion,
+p50, p99 and max; loses p95 (+1.6%), mean (+3.9%), throughput (−6.4%). The 4 failures come from a memory-guard bug: a
+reused slot's old leftover is freed by llama.cpp only when it reaches that slot's prompt, not when the request is sent.
+Lab log §33.
+
 ## Files
 
 `results/mem_admission/smoke_exp4_cap{1024,2048,4096,8192}/`: `tasks.csv`, `requests.csv` (one row per chunk: reservation,
@@ -410,3 +511,23 @@ reserved after every dispatch), `dispatches.csv`, `events.csv` (deadlock discard
 export MODEL=/path/to/Qwen3-0.6B-Q8_0.gguf LLAMA_SERVER=/path/to/instrumented/llama-server
 experiments/mem_admission/run_caps.sh        # ~65 min: caps 1,024, 2,048, 4,096, 8,192, then the comparison
 ```
+
+## SLO benchmark on 500 tasks: FIFO N4 vs E11b, 3 runs each (2026-11-27/28)
+
+- **Scripts:** `run_slo_bench_500.sh` (runs F1 E2 F2 E3 F3, then solo 500×3 retain, then analysis) and `slo_benchmark.py SOLO_NAME OUT_DIR "LABEL=run1,run2,run3" ...`.
+- **Inputs:** solo base `results/solo_SLO/full500_v1`; output `results/mem_admission/slo_bench_500/`.
+- **Slowdown** = completion / solo mean (failed tasks = ∞). Metrics are computed per run, then mean ± std over the runs.
+
+| Metric (mean of 3 runs) | FIFO N4 | E11b |
+|---|---:|---:|
+| completed | 477.3 | 500 |
+| tasks/min | 4.1 | 3.9 |
+| latency p50 / p95 / p99 (s) | 2,847 / 4,751 / 5,654 | 1,571 / 5,864 / 6,876 |
+| latency mean (s) | 2,590 | 2,085 |
+| slowdown p50 | 153 | 56 |
+| SLO 20× / 100× / 200× met | 6.5% / 33.9% / 61.4% | 35.3% / 63.1% / 76.9% |
+
+- **Per task:** E11b has a lower mean slowdown on 324 of 500 tasks.
+- **Segments:** E11b wins every segment except 1-step tasks (SLO 100× 39.0% vs 51.5%).
+- **Where E11b is strongest:** nl2bash (99.6% vs 17.6%) and second-half arrivals (64.7% vs 13.9%).
+- Full discussion: lab log §34.1.

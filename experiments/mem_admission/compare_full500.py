@@ -19,6 +19,14 @@ RUNS = {
     "E6: cap 2,048 + lookup order": ROOT / "results/mem_admission/full500_e6_cap2048_lookup",
     "E7a: cap 2,048 + online median order": ROOT / "results/mem_admission/full500_e7a_cap2048_online_median",
     "E7b: cap 2,048 + online model order": ROOT / "results/mem_admission/full500_e7b_cap2048_online_gbm",
+    "E8 T=120: E7b + starvation guard 120 s": ROOT / "results/mem_admission/full500_e8a_cap2048_online_gbm_starve120",
+    "E8 T=240: E7b + starvation guard 240 s": ROOT / "results/mem_admission/full500_e8_cap2048_online_gbm_starve240",
+    "E8 T=600: E7b + starvation guard 600 s": ROOT / "results/mem_admission/full500_e8_cap2048_online_gbm_starve600",
+    "E10b: split pool a=0.5, P=E7b, F=mem-aware FCFS": ROOT / "results/mem_admission/full500_e10b_cap2048_gbm_split_a050_fcfs_mem",
+    "E10c: E10b + per-partition deadlock breaker (rebuilt binary)": ROOT / "results/mem_admission/full500_e10c_cap2048_gbm_split_a050_fcfs_mem_pbreak",
+    "E11b: E7b + slot reuse, own-first slot order (rebuilt binary)": ROOT / "results/mem_admission/full500_e11b_cap2048_gbm_slotreuse_ownfirst",
+    "E12: E11b + at most 4 running (rebuilt binary)": ROOT / "results/mem_admission/full500_e12_cap2048_gbm_slotreuse_ownfirst_run4",
+    "E12b: E12 with server -np 4 (rebuilt binary)": ROOT / "results/mem_admission/full500_e12b_cap2048_gbm_slotreuse_ownfirst_np4",
 }
 
 
@@ -52,7 +60,9 @@ def metrics(path: Path) -> dict:
         y = [tr[(a, b)] for a, b in zip(n.task_id, n.step)]
         out["online_tau_b"] = kendalltau(n.pred, y).statistic
         out["requests_with_prediction"] = len(n)
-    for k in ("continuations", "deadlock_discards", "max_wait_s", "peak_running", "online_refits"):
+    for k in ("continuations", "deadlock_discards", "max_wait_s", "peak_running", "online_refits",
+              "starving_promotions", "starving_admissions", "starve_blocked_s", "admitted_by_P", "admitted_by_F",
+              "admitted_oversized", "oversized_fails"):
         if k in s:
             out[k] = s[k]
     return out
